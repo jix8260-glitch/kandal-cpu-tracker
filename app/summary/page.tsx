@@ -22,7 +22,10 @@ import {
   Save,
   Clock,
   Sparkles,
-  Award
+  Award,
+  RefreshCw,
+  Cloud,
+  CloudOff
 } from 'lucide-react';
 import {
   StockItem,
@@ -111,6 +114,49 @@ export default function SummaryPage() {
   >({});
   const [v5Prices, setV5Prices] = useState<Record<string, number>>({});
 
+  // Cloud Sync state
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [lastSyncedTime, setLastSyncedTime] = useState<string>('');
+
+  const fetchFromCloud = async () => {
+    try {
+      setSyncStatus('syncing');
+      const res = await fetch('/api/sync', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Sync failed');
+      const cloudData = await res.json();
+
+      if (cloudData) {
+        if (cloudData.storesByDate && Object.keys(cloudData.storesByDate).length > 0) {
+          setV5Stores(prev => {
+            const merged = { ...prev, ...cloudData.storesByDate };
+            try { localStorage.setItem('kandal_cpu_stores_by_date_v5', JSON.stringify(merged)); } catch(e){}
+            return merged;
+          });
+        }
+        if (cloudData.stockByDate && Object.keys(cloudData.stockByDate).length > 0) {
+          setV5Stock(prev => {
+            const merged = { ...prev, ...cloudData.stockByDate };
+            try { localStorage.setItem('kandal_cpu_stock_by_date_v5', JSON.stringify(merged)); } catch(e){}
+            return merged;
+          });
+        }
+        if (cloudData.itemPrices && Object.keys(cloudData.itemPrices).length > 0) {
+          setV5Prices(prev => {
+            const merged = { ...prev, ...cloudData.itemPrices };
+            try { localStorage.setItem('kandal_cpu_item_prices_v5', JSON.stringify(merged)); } catch(e){}
+            return merged;
+          });
+        }
+        setSyncStatus('synced');
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastSyncedTime(timeStr);
+      }
+    } catch (e) {
+      console.error('Error fetching cloud sync in summary', e);
+      setSyncStatus('error');
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -132,6 +178,18 @@ export default function SummaryPage() {
         console.error('Error loading logs', e);
       }
     }
+
+    // Pull from cloud
+    fetchFromCloud();
+
+    // Pull on tab focus / visible
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchFromCloud();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
   }, []);
 
   // Formatted date string
@@ -380,6 +438,43 @@ export default function SummaryPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Cloud Sync Status Badge & Button */}
+            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
+              {syncStatus === 'syncing' && (
+                <span className="flex items-center gap-1 text-amber-700 font-bold">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                  <span>Syncing...</span>
+                </span>
+              )}
+              {syncStatus === 'synced' && (
+                <span className="flex items-center gap-1 text-emerald-700 font-bold" title={`Last synced: ${lastSyncedTime}`}>
+                  <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Cloud Synced {lastSyncedTime ? `(${lastSyncedTime})` : ''}</span>
+                </span>
+              )}
+              {syncStatus === 'error' && (
+                <span className="flex items-center gap-1 text-rose-700 font-bold">
+                  <CloudOff className="w-3.5 h-3.5 text-rose-500" />
+                  <span>Offline</span>
+                </span>
+              )}
+              {syncStatus === 'idle' && (
+                <span className="flex items-center gap-1 text-slate-500 font-medium">
+                  <Cloud className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Ready</span>
+                </span>
+              )}
+              <button
+                onClick={() => fetchFromCloud()}
+                disabled={syncStatus === 'syncing'}
+                className="ml-1 flex items-center gap-1 px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-xs font-bold transition-all shadow-xs active:scale-95 disabled:opacity-50"
+                title="ទាញទិន្នន័យចុងក្រោយពី Cloud (Pull from Cloud)"
+              >
+                <RefreshCw className={`w-3 h-3 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                <span>Sync Cloud 🔄</span>
+              </button>
+            </div>
+
             <button
               onClick={() => setIsDeliveryModalOpen(true)}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"

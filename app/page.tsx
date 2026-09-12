@@ -6,7 +6,7 @@ import {
   Store, 
   Package, 
   TrendingUp, 
-  TrendingDown,
+  TrendingDown, 
   Award, 
   Calendar, 
   Search, 
@@ -20,7 +20,10 @@ import {
   ArrowDownRight, 
   ArrowUpRight,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RefreshCw,
+  Cloud,
+  CloudOff
 } from "lucide-react";
 import { STARTER_ITEMS } from "@/lib/starter-items";
 
@@ -54,18 +57,18 @@ export interface StockItemRecord {
 // =========================================================================
 const DEFAULT_ZERO_STORES: StoreTotalRecord[] = [
   // Tube Coffee+ (9 Stores)
-  { id: "s1", code: "KPI", name: "Tube Coffee KPI", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
-  { id: "s2", code: "TKC", name: "Tube Coffee TKC", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
-  { id: "s3", code: "CCV", name: "Tube Coffee CCV", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
-  { id: "s4", code: "CDP", name: "Tube Coffee CDP", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
-  { id: "s5", code: "CYH", name: "Tube Coffee CYH", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
-  { id: "s6", code: "KSH", name: "Tube Coffee KSH", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
-  { id: "s7", code: "CKD", name: "Tube Coffee CKD", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
-  { id: "s8", code: "2K4", name: "Tube Coffee 2K4", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
-  { id: "s9", code: "ATN", name: "Tube Coffee ATN", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
+  { id: "s1", code: "KPI", name: "Tube Coffee+ KPI", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
+  { id: "s2", code: "TKC", name: "Tube Coffee+ TKC", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
+  { id: "s3", code: "CCV", name: "Tube Coffee+ CCV", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
+  { id: "s4", code: "CDP", name: "Tube Coffee+ CDP", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
+  { id: "s5", code: "CMH", name: "Tube Coffee+ CMH", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
+  { id: "s6", code: "KSH", name: "Tube Coffee+ KSH", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
+  { id: "s7", code: "CKD", name: "Tube Coffee+ CKD", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
+  { id: "s8", code: "2K4", name: "Tube Coffee+ 2K4", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
+  { id: "s9", code: "RTN", name: "Tube Coffee+ RTN", brand: "Tube Coffee", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
   
   // OnMart (4 Stores)
-  { id: "s10", code: "POK", name: "OnMart POK", brand: "OnMart", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
+  { id: "s10", code: "PDK", name: "OnMart PDK", brand: "OnMart", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
   { id: "s11", code: "TK",  name: "OnMart TK",  brand: "OnMart", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
   { id: "s12", code: "OU3", name: "OnMart OU3", brand: "OnMart", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
   { id: "s13", code: "DT",  name: "OnMart DT",  brand: "OnMart", dailyAmount: 0, monthlyAmount: 0, yearlyAmount: 0 },
@@ -141,34 +144,148 @@ export default function StandardInventoryDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [notification, setNotification] = useState<string | null>(null);
 
-  // Load saved data from localStorage on mount
+  // Cloud Sync state
+  const [syncStatus, setSyncStatus] = useState<"idle" | "syncing" | "synced" | "error">("idle");
+  const [lastSyncedTime, setLastSyncedTime] = useState<string>("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Function to pull latest data from cloud API
+  const fetchFromCloud = async (showToast = false) => {
+    try {
+      setSyncStatus("syncing");
+      const res = await fetch("/api/sync", { cache: "no-store" });
+      if (!res.ok) throw new Error("Sync failed");
+      const cloudData = await res.json();
+
+      if (cloudData) {
+        if (cloudData.storesByDate && Object.keys(cloudData.storesByDate).length > 0) {
+          setStoresByDate(prev => {
+            const merged = { ...prev, ...cloudData.storesByDate };
+            try { localStorage.setItem(STORAGE_STORES_BY_DATE_KEY, JSON.stringify(merged)); } catch(e){}
+            return merged;
+          });
+        }
+        if (cloudData.stockByDate && Object.keys(cloudData.stockByDate).length > 0) {
+          setStockByDate(prev => {
+            const merged = { ...prev, ...cloudData.stockByDate };
+            try { localStorage.setItem(STORAGE_STOCK_BY_DATE_KEY, JSON.stringify(merged)); } catch(e){}
+            return merged;
+          });
+        }
+        if (cloudData.itemPrices && Object.keys(cloudData.itemPrices).length > 0) {
+          setItemPrices(prev => {
+            const merged = { ...prev, ...cloudData.itemPrices };
+            try { localStorage.setItem(STORAGE_ITEM_PRICES_KEY, JSON.stringify(merged)); } catch(e){}
+            return merged;
+          });
+        }
+        setSyncStatus("synced");
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastSyncedTime(timeStr);
+        if (showToast) {
+          triggerNotification(`✅ ទាញទិន្នន័យពី Cloud ជោគជ័យ! (${timeStr})`);
+        }
+      }
+    } catch (err) {
+      console.error("Fetch from cloud error:", err);
+      setSyncStatus("error");
+      if (showToast) {
+        triggerNotification(`⚠️ មិនអាចភ្ជាប់ Cloud (កំពុងប្រើ Offline Local)`);
+      }
+    }
+  };
+
+  // Function to push data to cloud API
+  const saveToCloud = async (
+    targetStoresByDate: typeof storesByDate,
+    targetStockByDate: typeof stockByDate,
+    targetItemPrices: typeof itemPrices
+  ) => {
+    setIsSaving(true);
+    setSyncStatus("syncing");
+    try {
+      // Always persist locally
+      try {
+        localStorage.setItem(STORAGE_STORES_BY_DATE_KEY, JSON.stringify(targetStoresByDate));
+        localStorage.setItem(STORAGE_STOCK_BY_DATE_KEY, JSON.stringify(targetStockByDate));
+        localStorage.setItem(STORAGE_ITEM_PRICES_KEY, JSON.stringify(targetItemPrices));
+      } catch (e) {}
+
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          storesByDate: targetStoresByDate,
+          stockByDate: targetStockByDate,
+          itemPrices: targetItemPrices,
+        }),
+      });
+
+      if (res.ok) {
+        setSyncStatus("synced");
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        setLastSyncedTime(timeStr);
+        setIsSaving(false);
+        return true;
+      } else {
+        setSyncStatus("error");
+        setIsSaving(false);
+        return false;
+      }
+    } catch (err) {
+      console.error("Save to cloud error:", err);
+      setSyncStatus("error");
+      setIsSaving(false);
+      return false;
+    }
+  };
+
+  // Load saved data on mount, then pull from cloud
   useEffect(() => {
     try {
       const savedStores = localStorage.getItem(STORAGE_STORES_BY_DATE_KEY);
-      if (savedStores) {
-        setStoresByDate(JSON.parse(savedStores));
-      }
+      if (savedStores) setStoresByDate(JSON.parse(savedStores));
 
       const savedStock = localStorage.getItem(STORAGE_STOCK_BY_DATE_KEY);
-      if (savedStock) {
-        setStockByDate(JSON.parse(savedStock));
-      }
+      if (savedStock) setStockByDate(JSON.parse(savedStock));
 
       const savedPrices = localStorage.getItem(STORAGE_ITEM_PRICES_KEY);
-      if (savedPrices) {
-        setItemPrices(JSON.parse(savedPrices));
-      }
+      if (savedPrices) setItemPrices(JSON.parse(savedPrices));
     } catch (e) {
       console.error("Failed to load inventory data", e);
     }
+
+    // Pull latest data from cloud
+    fetchFromCloud();
+
+    // Re-sync when switching back to this tab (especially on phone)
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        fetchFromCloud();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, []);
 
   // Current stores for the selected date (default to 0 if none)
   const currentStores = useMemo<StoreTotalRecord[]>(() => {
-    if (storesByDate[selectedDate]) {
-      return storesByDate[selectedDate];
-    }
-    return DEFAULT_ZERO_STORES.map(s => ({ ...s }));
+    const existing = storesByDate[selectedDate];
+    return DEFAULT_ZERO_STORES.map(base => {
+      const match = existing?.find(s => 
+        s.code === base.code ||
+        (base.code === "CMH" && (s.code === "CYH" || s.code === "CMH")) ||
+        (base.code === "RTN" && (s.code === "ATN" || s.code === "RTN")) ||
+        (base.code === "PDK" && (s.code === "POK" || s.code === "PDK")) ||
+        s.id === base.id
+      );
+      return {
+        ...base,
+        dailyAmount: match?.dailyAmount ?? 0,
+        monthlyAmount: match?.monthlyAmount ?? 0,
+        yearlyAmount: match?.yearlyAmount ?? 0,
+      };
+    });
   }, [storesByDate, selectedDate]);
 
   // Current stock items for the selected date (default to 0 if none)
@@ -190,7 +307,7 @@ export default function StandardInventoryDashboard() {
   // Show auto-dismiss notification
   const triggerNotification = (msg: string) => {
     setNotification(msg);
-    setTimeout(() => setNotification(null), 3000);
+    setTimeout(() => setNotification(null), 3500);
   };
 
   // -------------------------------------------------------------
@@ -203,8 +320,9 @@ export default function StandardInventoryDashboard() {
   ) => {
     const cleanVal = isNaN(val) || val < 0 ? 0 : val;
 
+    let nextPrices = itemPrices;
     if (field === "cpu") {
-      const nextPrices = { ...itemPrices, [itemCode]: cleanVal };
+      nextPrices = { ...itemPrices, [itemCode]: cleanVal };
       setItemPrices(nextPrices);
       try {
         localStorage.setItem(STORAGE_ITEM_PRICES_KEY, JSON.stringify(nextPrices));
@@ -220,6 +338,16 @@ export default function StandardInventoryDashboard() {
     try {
       localStorage.setItem(STORAGE_STOCK_BY_DATE_KEY, JSON.stringify(nextStockByDate));
     } catch (e) {}
+  };
+
+  const handleSaveStockLog = async () => {
+    triggerNotification(`កំពុងរក្សាទុកស្តុក (${selectedDate}) ទៅ Cloud & Phone...`);
+    const success = await saveToCloud(storesByDate, stockByDate, itemPrices);
+    if (success) {
+      triggerNotification(`✅ បានរក្សាទុកស្តុក (${selectedDate}) ទៅ Cloud រួចរាល់! អាចមើលឃើញលើទូរសព្ទ័ភ្លាមៗ`);
+    } else {
+      triggerNotification(`✅ បានរក្សាទុកក្នុងទូរសព្ទ័/កុំព្យូទ័រ (Local)`);
+    }
   };
 
   // Overall Stock In & Out KPI for selected date
@@ -265,6 +393,16 @@ export default function StandardInventoryDashboard() {
     try {
       localStorage.setItem(STORAGE_STORES_BY_DATE_KEY, JSON.stringify(nextStoresByDate));
     } catch (e) {}
+  };
+
+  const handleSaveStoreTotals = async () => {
+    triggerNotification(`កំពុងរក្សាទុកបរិមាណសរុបសាខា (${selectedDate}) ទៅ Cloud & Phone...`);
+    const success = await saveToCloud(storesByDate, stockByDate, itemPrices);
+    if (success) {
+      triggerNotification(`✅ បានរក្សាទុកបរិមាណសរុបសាខា (${selectedDate}) ទៅ Cloud រួចរាល់! អាចមើលឃើញលើទូរសព្ទ័ភ្លាមៗ`);
+    } else {
+      triggerNotification(`✅ បានរក្សាទុកក្នុងទូរសព្ទ័/កុំព្យូទ័រ (Local)`);
+    }
   };
 
   // TOP 5 STORES (Ranked by active period amount for selected date)
@@ -331,8 +469,46 @@ export default function StandardInventoryDashboard() {
           </p>
         </div>
 
-        {/* MAIN TABS & NAVIGATION */}
+        {/* MAIN TABS, CLOUD SYNC & NAVIGATION */}
         <div className="flex flex-wrap items-center gap-2">
+          {/* Cloud Sync Status Badge & Manual Trigger */}
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
+            {syncStatus === "syncing" && (
+              <span className="flex items-center gap-1.5 text-amber-700 font-bold">
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                <span>Syncing Cloud...</span>
+              </span>
+            )}
+            {syncStatus === "synced" && (
+              <span className="flex items-center gap-1.5 text-emerald-700 font-bold" title={`Last synced: ${lastSyncedTime}`}>
+                <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Cloud Synced {lastSyncedTime ? `(${lastSyncedTime})` : ''}</span>
+              </span>
+            )}
+            {syncStatus === "error" && (
+              <span className="flex items-center gap-1.5 text-rose-700 font-bold">
+                <CloudOff className="w-3.5 h-3.5 text-rose-500" />
+                <span>Cloud Offline</span>
+              </span>
+            )}
+            {syncStatus === "idle" && (
+              <span className="flex items-center gap-1.5 text-slate-500 font-medium">
+                <Cloud className="w-3.5 h-3.5 text-slate-400" />
+                <span>Cloud Ready</span>
+              </span>
+            )}
+
+            <button
+              onClick={() => fetchFromCloud(true)}
+              disabled={syncStatus === "syncing"}
+              className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-xs font-bold transition-all shadow-xs active:scale-95 disabled:opacity-50"
+              title="ទាញទិន្នន័យចុងក្រោយពី Cloud (Pull from Cloud)"
+            >
+              <RefreshCw className={`w-3 h-3 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+              <span>Sync Cloud 🔄</span>
+            </button>
+          </div>
+
           <div className="flex items-center bg-slate-100 p-1.5 rounded-xl border border-slate-200">
             <button
               onClick={() => { setActiveTab("stock"); setSearchTerm(""); }}
@@ -600,13 +776,12 @@ export default function StandardInventoryDashboard() {
                 </div>
 
                 <button
-                  onClick={() => {
-                    triggerNotification(`បានរក្សាទុកស្តុកប្រចាំថ្ងៃ (${selectedDate}) ដោយជោគជ័យ!`);
-                  }}
-                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+                  onClick={handleSaveStockLog}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save Stock Log</span>
+                  {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>{isSaving ? "កំពុងរក្សាទុក..." : "Save Stock Log"}</span>
                 </button>
               </div>
             </div>
@@ -652,8 +827,15 @@ export default function StandardInventoryDashboard() {
                             type="number"
                             min="0"
                             step="0.01"
-                            value={item.cpu}
-                            onChange={(e) => handleStockNumberChange(item.item_code, "cpu", parseFloat(e.target.value))}
+                            inputMode="decimal"
+                            placeholder="0"
+                            value={item.cpu === 0 ? "" : item.cpu}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              const num = v === "" ? 0 : parseFloat(v);
+                              handleStockNumberChange(item.item_code, "cpu", isNaN(num) ? 0 : num);
+                            }}
                             className="w-18 px-2 py-1 text-center font-bold text-slate-800 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-xs"
                           />
                         </td>
@@ -663,8 +845,15 @@ export default function StandardInventoryDashboard() {
                           <input
                             type="number"
                             min="0"
-                            value={item.opening_stock}
-                            onChange={(e) => handleStockNumberChange(item.item_code, "opening_stock", parseInt(e.target.value))}
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={item.opening_stock === 0 ? "" : item.opening_stock}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              const num = v === "" ? 0 : parseInt(v, 10);
+                              handleStockNumberChange(item.item_code, "opening_stock", isNaN(num) ? 0 : num);
+                            }}
                             className="w-20 px-2 py-1 text-center font-bold text-slate-700 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-xs"
                           />
                         </td>
@@ -674,8 +863,15 @@ export default function StandardInventoryDashboard() {
                           <input
                             type="number"
                             min="0"
-                            value={item.stock_in}
-                            onChange={(e) => handleStockNumberChange(item.item_code, "stock_in", parseInt(e.target.value))}
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={item.stock_in === 0 ? "" : item.stock_in}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              const num = v === "" ? 0 : parseInt(v, 10);
+                              handleStockNumberChange(item.item_code, "stock_in", isNaN(num) ? 0 : num);
+                            }}
                             className="w-20 px-2 py-1 text-center font-bold text-emerald-700 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-xs"
                           />
                         </td>
@@ -685,8 +881,15 @@ export default function StandardInventoryDashboard() {
                           <input
                             type="number"
                             min="0"
-                            value={item.stock_out}
-                            onChange={(e) => handleStockNumberChange(item.item_code, "stock_out", parseInt(e.target.value))}
+                            inputMode="numeric"
+                            placeholder="0"
+                            value={item.stock_out === 0 ? "" : item.stock_out}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              const num = v === "" ? 0 : parseInt(v, 10);
+                              handleStockNumberChange(item.item_code, "stock_out", isNaN(num) ? 0 : num);
+                            }}
                             className="w-20 px-2 py-1 text-center font-bold text-rose-700 border border-rose-300 rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none text-xs"
                           />
                         </td>
@@ -877,7 +1080,7 @@ export default function StandardInventoryDashboard() {
                     onClick={() => setSelectedBrand("Tube Coffee")}
                     className={`px-3 py-1.5 rounded-md transition-all ${selectedBrand === "Tube Coffee" ? "bg-white text-amber-700 shadow-sm" : "text-slate-500"}`}
                   >
-                    Tube Coffee (9)
+                    Tube Coffee+ (9)
                   </button>
                   <button
                     onClick={() => setSelectedBrand("OnMart")}
@@ -888,13 +1091,12 @@ export default function StandardInventoryDashboard() {
                 </div>
 
                 <button
-                  onClick={() => {
-                    triggerNotification(`បានរក្សាទុកបរិមាណសរុបសាខាថ្ងៃ (${selectedDate}) ដោយជោគជ័យ!`);
-                  }}
-                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm"
+                  onClick={handleSaveStoreTotals}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm disabled:opacity-50"
                 >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save Store Totals</span>
+                  {isSaving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  <span>{isSaving ? "កំពុងរក្សាទុក..." : "Save Store Totals"}</span>
                 </button>
               </div>
             </div>
@@ -936,8 +1138,15 @@ export default function StandardInventoryDashboard() {
                         <input
                           type="number"
                           min="0"
-                          value={store.dailyAmount}
-                          onChange={(e) => handleStoreAmountChange(store.id, "dailyAmount", parseInt(e.target.value))}
+                          inputMode="numeric"
+                          placeholder="0"
+                          value={store.dailyAmount === 0 ? "" : store.dailyAmount}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const num = v === "" ? 0 : parseInt(v, 10);
+                            handleStoreAmountChange(store.id, "dailyAmount", isNaN(num) ? 0 : num);
+                          }}
                           className="w-24 px-2 py-1 text-center font-bold text-emerald-700 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-xs"
                         />
                       </td>
@@ -947,8 +1156,15 @@ export default function StandardInventoryDashboard() {
                         <input
                           type="number"
                           min="0"
-                          value={store.monthlyAmount}
-                          onChange={(e) => handleStoreAmountChange(store.id, "monthlyAmount", parseInt(e.target.value))}
+                          inputMode="numeric"
+                          placeholder="0"
+                          value={store.monthlyAmount === 0 ? "" : store.monthlyAmount}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const num = v === "" ? 0 : parseInt(v, 10);
+                            handleStoreAmountChange(store.id, "monthlyAmount", isNaN(num) ? 0 : num);
+                          }}
                           className="w-24 px-2 py-1 text-center font-bold text-indigo-700 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs"
                         />
                       </td>
@@ -958,8 +1174,15 @@ export default function StandardInventoryDashboard() {
                         <input
                           type="number"
                           min="0"
-                          value={store.yearlyAmount}
-                          onChange={(e) => handleStoreAmountChange(store.id, "yearlyAmount", parseInt(e.target.value))}
+                          inputMode="numeric"
+                          placeholder="0"
+                          value={store.yearlyAmount === 0 ? "" : store.yearlyAmount}
+                          onFocus={(e) => e.target.select()}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            const num = v === "" ? 0 : parseInt(v, 10);
+                            handleStoreAmountChange(store.id, "yearlyAmount", isNaN(num) ? 0 : num);
+                          }}
                           className="w-28 px-2 py-1 text-center font-bold text-slate-700 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs"
                         />
                       </td>
