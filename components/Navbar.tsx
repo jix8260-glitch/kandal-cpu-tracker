@@ -15,7 +15,7 @@ export const Navbar: React.FC = () => {
   const navLinks = [
     { href: '/', label: 'Daily Stock Tracker', icon: <Calendar className="w-4 h-4" /> },
     { href: '/items', label: 'Item Master & CPU', icon: <Package className="w-4 h-4" /> },
-    { href: '/summary', label: '12-Month Summary', icon: <BarChart3 className="w-4 h-4" /> },
+    { href: '/summary', label: 'Stores & Summary (១៣ ហាង)', icon: <BarChart3 className="w-4 h-4" /> },
   ];
 
   return (

@@ -63,9 +63,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     setMounted(true);
 
-    // Initialize default password if not already set
-    if (!localStorage.getItem('kandal_cpu_password')) {
-      localStorage.setItem('kandal_cpu_password', '1234');
+    // Purge old '1234' completely and set new default PIN '8899'
+    const currentStoredPass = localStorage.getItem('kandal_cpu_password');
+    if (!currentStoredPass || currentStoredPass === '1234') {
+      localStorage.setItem('kandal_cpu_password', '8899');
+      sessionStorage.removeItem('kandal_cpu_auth_token');
+      localStorage.removeItem('kandal_cpu_auth_expiry');
     }
 
     // Check session or persistent authentication
@@ -132,9 +135,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (e) e.preventDefault();
     if (lockoutTimer > 0) return;
 
-    const storedPassword = localStorage.getItem('kandal_cpu_password') || '1234';
+    const storedPassword = localStorage.getItem('kandal_cpu_password') || '8899';
 
-    if (inputPassword === storedPassword || inputPassword === '1234') {
+    if (inputPassword === storedPassword) {
       setIsUnlocked(true);
       setErrorMessage('');
       setInputPassword('');
@@ -197,8 +200,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Change Password
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
-    const stored = localStorage.getItem('kandal_cpu_password') || '1234';
-    if (currentPassword !== stored && currentPassword !== '1234') {
+    const stored = localStorage.getItem('kandal_cpu_password') || '8899';
+    if (currentPassword !== stored) {
       setSettingsNotice('❌ លេខសម្ងាត់ចាស់មិនត្រឹមត្រូវទេ!');
       return;
     }
@@ -289,8 +292,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             <p className="text-xs font-bold text-emerald-400 mt-0.5">
               Kandal Commissary Kitchen
             </p>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Tube Coffee (69 SKUs) &amp; OnMart (36 SKUs)
+            <p className="text-[11px] text-slate-400 mt-1 font-medium">
+              Tube Coffee+ (69 Items) &amp; OnMart (36 Items) • 13 Stores
             </p>
           </div>
 

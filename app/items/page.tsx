@@ -173,7 +173,7 @@ export default function ItemMasterPage() {
           className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
         >
           <Plus className="w-4 h-4" />
-          <span>Add New SKU (បន្ថែមមុខទំនិញ)</span>
+          <span>Add New Item (បន្ថែមមុខទំនិញ)</span>
         </button>
       </div>
 
@@ -196,7 +196,7 @@ export default function ItemMasterPage() {
             }`}
           >
             <Coffee className="w-3.5 h-3.5 text-amber-600" />
-            <span>Tube Coffee</span>
+            <span>Tube Coffee+ (9 ហាង)</span>
           </button>
           <button
             onClick={() => setSelectedLocation('ONMART')}
@@ -205,7 +205,7 @@ export default function ItemMasterPage() {
             }`}
           >
             <Store className="w-3.5 h-3.5 text-emerald-600" />
-            <span>OnMart</span>
+            <span>OnMart (4 ហាង)</span>
           </button>
         </div>
 
@@ -266,7 +266,7 @@ export default function ItemMasterPage() {
                               : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                           }`}
                         >
-                          {item.location === 'TUBE_COFFEE' ? 'Tube Coffee' : 'OnMart'}
+                          {item.location === 'TUBE_COFFEE' ? 'Tube Coffee+' : 'OnMart'}
                         </span>
                       </td>
                       <td className="py-3 px-3 text-slate-600 font-medium">{item.category}</td>
@@ -360,7 +360,7 @@ export default function ItemMasterPage() {
                     onChange={(e) => setLocation(e.target.value as any)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 font-bold focus:outline-none focus:ring-1 focus:ring-blue-500"
                   >
-                    <option value="TUBE_COFFEE">Tube Coffee</option>
+                    <option value="TUBE_COFFEE">Tube Coffee+</option>
                     <option value="ONMART">OnMart</option>
                   </select>
                 </div>

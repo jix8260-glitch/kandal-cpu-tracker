@@ -82,7 +82,7 @@ export const KPICards: React.FC<KPICardsProps> = ({
           </div>
         </div>
         <div className="text-2xl font-black text-slate-800">
-          {activeItemCount} <span className="text-xs font-normal text-slate-500">SKUs</span>
+          {activeItemCount} <span className="text-xs font-normal text-slate-500">Items</span>
         </div>
         <div className="mt-2 text-[11px] text-slate-500 flex justify-between pt-2 border-t border-slate-100">
           <span>Total Balance: {totalBalance.toLocaleString()} units</span>

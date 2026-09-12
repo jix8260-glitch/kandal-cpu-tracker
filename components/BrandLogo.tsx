@@ -45,7 +45,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           </div>
           {showSubtitle && (
             <p className="text-[11px] text-slate-500 font-medium tracking-tight mt-1">
-              Company: <strong className="text-slate-800 font-bold">Kandal Commissary Kitchen</strong> • Tube Coffee &amp; OnMart
+              Company: <strong className="text-slate-800 font-bold">Kandal Commissary Kitchen</strong> • Tube Coffee+ &amp; OnMart
             </p>
           )}
         </div>
