@@ -393,10 +393,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             </button>
           </form>
 
-          {/* Hint Footer */}
-          <div className="mt-5 text-center text-[11px] text-slate-500">
-            <span>លេខកូដលំនាំដើម (Default PIN): </span>
-            <strong className="text-emerald-400 font-mono font-bold">1234</strong>
+          {/* Security Confidentiality Notice */}
+          <div className="mt-5 text-center text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
+            <Lock className="w-3 h-3 text-slate-500" />
+            <span>ប្រព័ន្ធសម្ងាត់ផ្ទៃក្នុង • Kandal Kitchen Operations</span>
           </div>
         </div>
 
