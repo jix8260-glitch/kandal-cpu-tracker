@@ -58,22 +58,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Inactivity Auto-Lock Timer (30 minutes)
   const lastActivityRef = useRef<number>(Date.now());
+  const V3_PIN_KEY = 'kandal_cpu_pin_secret_v3';
+  const V3_AUTH_KEY = 'kandal_cpu_auth_token_v3';
 
   // 1. Initial Authentication Check on Mount
   useEffect(() => {
     setMounted(true);
 
-    // Purge old '1234' completely and set new default PIN '8899'
-    const currentStoredPass = localStorage.getItem('kandal_cpu_password');
-    if (!currentStoredPass || currentStoredPass === '1234') {
-      localStorage.setItem('kandal_cpu_password', '8899');
-      sessionStorage.removeItem('kandal_cpu_auth_token');
-      localStorage.removeItem('kandal_cpu_auth_expiry');
+    // Hard purge legacy v1/v2 credentials
+    localStorage.removeItem('kandal_cpu_password');
+    sessionStorage.removeItem('kandal_cpu_auth_token');
+    localStorage.removeItem('kandal_cpu_auth_expiry');
+
+    // Ensure PIN is set to 8899
+    const activePin = localStorage.getItem(V3_PIN_KEY);
+    if (!activePin || activePin === '1234') {
+      localStorage.setItem(V3_PIN_KEY, '8899');
     }
 
     // Check session or persistent authentication
-    const sessionAuth = sessionStorage.getItem('kandal_cpu_auth_token') === 'authorized';
-    const persistentExpiry = localStorage.getItem('kandal_cpu_auth_expiry');
+    const sessionAuth = sessionStorage.getItem(V3_AUTH_KEY) === 'authorized';
+    const persistentExpiry = localStorage.getItem(V3_AUTH_KEY + '_expiry');
     const isPersistentValid =
       persistentExpiry && Number(persistentExpiry) > Date.now();
 
@@ -135,7 +140,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (e) e.preventDefault();
     if (lockoutTimer > 0) return;
 
-    const storedPassword = localStorage.getItem('kandal_cpu_password') || '8899';
+    // Hard block old 1234 PIN with helpful message
+    if (inputPassword === '1234') {
+      setErrorMessage('❌ លេខកូដចាស់ 1234 ត្រូវបានលុបចោលជាស្ថាពរ! សូមប្រើលេខកូដថ្មី (8899)');
+      setIsShaking(true);
+      setTimeout(() => setIsShaking(false), 500);
+      return;
+    }
+
+    const storedPassword = localStorage.getItem(V3_PIN_KEY) || '8899';
 
     if (inputPassword === storedPassword) {
       setIsUnlocked(true);
@@ -144,13 +157,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setFailedAttempts(0);
 
       // Store auth state
-      sessionStorage.setItem('kandal_cpu_auth_token', 'authorized');
+      sessionStorage.setItem(V3_AUTH_KEY, 'authorized');
       if (rememberMe) {
         // Remember for 7 days
         const sevenDays = Date.now() + 7 * 24 * 60 * 60 * 1000;
-        localStorage.setItem('kandal_cpu_auth_expiry', sevenDays.toString());
+        localStorage.setItem(V3_AUTH_KEY + '_expiry', sevenDays.toString());
       } else {
-        localStorage.removeItem('kandal_cpu_auth_expiry');
+        localStorage.removeItem(V3_AUTH_KEY + '_expiry');
       }
     } else {
       const nextAttempts = failedAttempts + 1;
@@ -169,12 +182,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Lock Application
   const lockApp = useCallback(() => {
-    sessionStorage.removeItem('kandal_cpu_auth_token');
-    localStorage.removeItem('kandal_cpu_auth_expiry');
+    sessionStorage.removeItem(V3_AUTH_KEY);
+    localStorage.removeItem(V3_AUTH_KEY + '_expiry');
     setIsUnlocked(false);
     setInputPassword('');
     setErrorMessage('');
-  }, []);
+  }, [V3_AUTH_KEY]);
 
   // Open Settings
   const openSettings = () => {
@@ -200,7 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Change Password
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
-    const stored = localStorage.getItem('kandal_cpu_password') || '8899';
+    const stored = localStorage.getItem(V3_PIN_KEY) || '8899';
     if (currentPassword !== stored) {
       setSettingsNotice('❌ លេខសម្ងាត់ចាស់មិនត្រឹមត្រូវទេ!');
       return;
@@ -209,12 +222,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSettingsNotice('❌ លេខសម្ងាត់ថ្មីត្រូវមានយ៉ាងហោចណាស់ ៤ ខ្ទង់!');
       return;
     }
+    if (newPassword === '1234') {
+      setSettingsNotice('❌ មិនអាចប្រើលេខចាស់ 1234 ឡើងវិញបានទេ!');
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setSettingsNotice('❌ លេខសម្ងាត់ផ្ទៀងផ្ទាត់មិនដូចគ្នាទេ!');
       return;
     }
 
-    localStorage.setItem('kandal_cpu_password', newPassword);
+    localStorage.setItem(V3_PIN_KEY, newPassword);
     setSettingsNotice('✅ បានផ្លាស់ប្តូរលេខសម្ងាត់ថ្មីដោយជោគជ័យ!');
     setCurrentPassword('');
     setNewPassword('');

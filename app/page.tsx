@@ -21,12 +21,14 @@ import {
   Cloud,
   Sparkles,
   BarChart2,
+  BarChart3,
   CalendarDays,
   ShieldCheck,
   Check,
 } from 'lucide-react';
 import Link from 'next/link';
 import { getNormalizedStarterItems } from '@/lib/starter-items';
+import { StoreDistributionDashboard } from '@/components/StoreDistributionDashboard';
 
 const MONTHS = [
   { num: 1, key: '01', en: 'Jan', kh: 'មករា' },
@@ -66,6 +68,7 @@ const setStoredLogs = (data: Record<string, Record<string, { stock_in: number; s
 };
 
 export default function DailyStockTrackerPage() {
+  const [mainView, setMainView] = useState<'DASHBOARD' | 'TRACKER'>('DASHBOARD');
   const [items, setItems] = useState<StockItem[]>([]);
   const [dailyLogs, setDailyLogs] = useState<Record<string, { stock_in: number; stock_out: number }>>({});
   const [selectedLocation, setSelectedLocation] = useState<FilterLocation>('ALL');
@@ -336,13 +339,20 @@ export default function DailyStockTrackerPage() {
     setSelectedDay(current.getDate());
   };
 
-  // Filter items based on search query
-  const filteredItems = items.filter(
-    (item) =>
+  // Filter items based on search query AND selectedStore
+  const filteredItems = items.filter((item) => {
+    if (selectedStore !== 'ALL') {
+      const storeObj = ALL_STORES.find((s) => s.code === selectedStore);
+      if (storeObj && item.location !== storeObj.brand) {
+        return false;
+      }
+    }
+    return (
       item.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description_khmer.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    );
+  });
 
   // Calculations
   let totalStockValue = 0;
@@ -379,37 +389,98 @@ export default function DailyStockTrackerPage() {
 
   return (
     <div className="space-y-6">
-      {/* 1. Control Toolbar */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h2 className="text-base sm:text-lg font-black text-slate-900 leading-tight flex items-center gap-2">
-              <span>CPU • Stock Tracker</span>
-              <span className="text-xs bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded-md border border-emerald-300">
-                Kandal Commissary Kitchen
-              </span>
-            </h2>
-            <p className="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-2">
-              <span>បែងចែកតាម <strong>ខែ &amp; ឆ្នាំ</strong> (Tube Coffee+ &amp; OnMart • 105 Items • 13 ហាង)</span>
-              {autoSavedNotice && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 animate-pulse">
-                  <Check className="w-3 h-3" />
-                  <span>រក្សាទុកស្វ័យប្រវត្តិ (Saved!)</span>
-                </span>
-              )}
-            </p>
+      {/* 0. Top Version & Master View Switcher */}
+      <div className="bg-slate-900 text-white rounded-3xl p-4 sm:p-6 shadow-xl border border-slate-800 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="px-2.5 py-0.5 rounded-md bg-emerald-500 text-slate-950 font-black text-xs uppercase tracking-wider">
+              Updated v2.5
+            </span>
+            <span className="text-xs text-slate-400 font-semibold">
+              Kandal Commissary Kitchen • 13 Stores Analytics
+            </span>
           </div>
+          <h1 className="text-base sm:text-xl font-black text-white mt-1">
+            {mainView === 'DASHBOARD'
+              ? '📊 របាយការណ៍ហាងទាំង ១៣ (Daily, Monthly, Yearly Amounts & Items)'
+              : '📝 តារាងកត់ត្រាស្តុកប្រចាំថ្ងៃ (Daily Stock In / Out Tracker)'}
+          </h1>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Tube Coffee+ (9 ហាង • 69 Items) &amp; OnMart (4 ហាង • 36 Items)
+          </p>
+        </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={fetchItemsAndLogs}
-              disabled={loading}
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold border border-slate-300 transition-colors"
-              title="Refresh Data"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
-            </button>
+        {/* View Switch Buttons */}
+        <div className="flex items-center bg-slate-800 p-1.5 rounded-2xl border border-slate-700 gap-1.5 text-xs font-black">
+          <button
+            onClick={() => setMainView('DASHBOARD')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${
+              mainView === 'DASHBOARD'
+                ? 'bg-emerald-500 text-slate-950 shadow-md scale-[1.02]'
+                : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>📊 របាយការណ៍ហាងទាំង ១៣ (Store Amounts)</span>
+          </button>
+
+          <button
+            onClick={() => setMainView('TRACKER')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl transition-all ${
+              mainView === 'TRACKER'
+                ? 'bg-emerald-500 text-slate-950 shadow-md scale-[1.02]'
+                : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>📝 កត់ត្រាស្តុកប្រចាំថ្ងៃ (Stock Tracker)</span>
+          </button>
+        </div>
+      </div>
+
+      {mainView === 'DASHBOARD' ? (
+        <StoreDistributionDashboard
+          initialStore={selectedStore}
+          onSelectStoreFilter={(code) => {
+            setSelectedStore(code);
+            if (code === 'TUBE_COFFEE' || code === 'ONMART' || code === 'ALL') {
+              setSelectedLocation(code as FilterLocation);
+            }
+          }}
+        />
+      ) : (
+        <>
+          {/* 1. Control Toolbar */}
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-slate-900 leading-tight flex items-center gap-2">
+                  <span>CPU • Stock Tracker</span>
+                  <span className="text-xs bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded-md border border-emerald-300">
+                    Kandal Commissary Kitchen
+                  </span>
+                </h2>
+                <p className="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-2">
+                  <span>បែងចែកតាម <strong>ខែ &amp; ឆ្នាំ</strong> (Tube Coffee+ &amp; OnMart • 105 Items • 13 ហាង)</span>
+                  {autoSavedNotice && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 animate-pulse">
+                      <Check className="w-3 h-3" />
+                      <span>រក្សាទុកស្វ័យប្រវត្តិ (Saved!)</span>
+                    </span>
+                  )}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={fetchItemsAndLogs}
+                  disabled={loading}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold border border-slate-300 transition-colors"
+                  title="Refresh Data"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
 
             {isSupabaseConfigured && items.length === 0 && (
               <button
@@ -733,7 +804,7 @@ export default function DailyStockTrackerPage() {
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="ស្វែងរកតាម Code ឬ ឈ្មោះ (105 SKUs)..."
+              placeholder="ស្វែងរកតាម Code ឬ ឈ្មោះ (105 Items)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-emerald-500 shadow-2xs"
@@ -963,6 +1034,8 @@ export default function DailyStockTrackerPage() {
           </table>
         </div>
       </div>
-    </div>
+    </>
+  )}
+</div>
   );
 }
