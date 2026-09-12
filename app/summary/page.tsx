@@ -102,6 +102,15 @@ export default function SummaryPage() {
     Record<string, Record<string, Record<string, number>>>
   >({});
 
+  // Linked v5 Stores & Stock from Dashboard
+  const [v5Stores, setV5Stores] = useState<
+    Record<string, Array<{ id: string; code: string; name: string; brand: string; dailyAmount: number; monthlyAmount: number; yearlyAmount: number }>>
+  >({});
+  const [v5Stock, setV5Stock] = useState<
+    Record<string, Array<{ item_code: string; description_khmer: string; brand: string; cpu: number; opening_stock: number; stock_in: number; stock_out: number }>>
+  >({});
+  const [v5Prices, setV5Prices] = useState<Record<string, number>>({});
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -110,6 +119,15 @@ export default function SummaryPage() {
 
         const rawDispatches = localStorage.getItem('kandal_cpu_store_dispatches');
         if (rawDispatches) setStoreDispatches(JSON.parse(rawDispatches));
+
+        const rawV5Stores = localStorage.getItem('kandal_cpu_stores_by_date_v5');
+        if (rawV5Stores) setV5Stores(JSON.parse(rawV5Stores));
+
+        const rawV5Stock = localStorage.getItem('kandal_cpu_stock_by_date_v5');
+        if (rawV5Stock) setV5Stock(JSON.parse(rawV5Stock));
+
+        const rawV5Prices = localStorage.getItem('kandal_cpu_item_prices_v5');
+        if (rawV5Prices) setV5Prices(JSON.parse(rawV5Prices));
       } catch (e) {
         console.error('Error loading logs', e);
       }
@@ -188,91 +206,114 @@ export default function SummaryPage() {
     return ALL_STORES.map((store) => {
       const storeItems = allItems.filter((it) => it.location === store.brand);
       const itemsCount = storeItems.length; // 69 for Tube Coffee+, 36 for OnMart
-      const weight = STORE_WEIGHTS[store.code] || 0.1;
+
+      // Match store with v5Stores
+      const dayV5StoreList = v5Stores[selectedDateStr];
+      const matchV5 = dayV5StoreList?.find(
+        (s) =>
+          s.code === store.code ||
+          (s.code === 'CYH' && store.code === 'CMH') ||
+          (s.code === 'CMH' && store.code === 'CYH') ||
+          (s.code === 'ATN' && store.code === 'RTN') ||
+          (s.code === 'RTN' && store.code === 'ATN') ||
+          (s.code === 'POK' && store.code === 'PDK') ||
+          (s.code === 'PDK' && store.code === 'POK')
+      );
 
       // 1. Daily Calculation (Selected Date)
-      let dailyUnits = 0;
+      let dailyUnits = matchV5?.dailyAmount || 0;
       let dailyAmount = 0;
       let dailyItemsList: { item: StockItem; qty: number; value: number }[] = [];
 
-      // Check manual dispatches first
+      // Check manual dispatches
       const dayDispatches = storeDispatches[selectedDateStr]?.[store.code];
-      const dayLogs = storedLogs[selectedDateStr] || {};
-
       if (dayDispatches && Object.keys(dayDispatches).length > 0) {
         Object.entries(dayDispatches).forEach(([itemId, qty]) => {
           const item = allItems.find((i) => i.id === itemId);
           if (item) {
+            const price = v5Prices[item.code] || 0;
+            const val = qty * price;
             dailyUnits += qty;
-            const val = qty * item.cpu;
             dailyAmount += val;
             dailyItemsList.push({ item, qty, value: val });
           }
         });
-      } else {
-        // Compute from Commissary Kitchen stock_out using branch weight
-        storeItems.forEach((item) => {
-          const log = dayLogs[item.id];
-          if (log && log.stock_out > 0) {
-            const storeQty = Math.round(log.stock_out * weight);
-            if (storeQty > 0) {
-              dailyUnits += storeQty;
-              const val = storeQty * item.cpu;
-              dailyAmount += val;
-              dailyItemsList.push({ item, qty: storeQty, value: val });
-            }
+      }
+
+      // Check prices for daily amount calculation
+      const storePrices = storeItems.map(it => v5Prices[it.code] || 0).filter(p => p > 0);
+      const avgPrice = storePrices.length > 0 ? storePrices.reduce((a, b) => a + b, 0) / storePrices.length : 0;
+      if (dailyAmount === 0 && dailyUnits > 0 && avgPrice > 0) {
+        dailyAmount = dailyUnits * avgPrice;
+      }
+
+      // 2. Monthly Calculation (Selected Month)
+      let monthlyUnits = matchV5?.monthlyAmount || 0;
+      let monthlyAmount = 0;
+
+      // Scan all stored v5 dates for that month if not manually keyed in
+      if (!monthlyUnits) {
+        Object.entries(v5Stores).forEach(([dStr, sList]) => {
+          if (dStr.startsWith(monthPrefix)) {
+            const st = sList.find(
+              (s) =>
+                s.code === store.code ||
+                (s.code === 'CYH' && store.code === 'CMH') ||
+                (s.code === 'CMH' && store.code === 'CYH') ||
+                (s.code === 'ATN' && store.code === 'RTN') ||
+                (s.code === 'RTN' && store.code === 'ATN') ||
+                (s.code === 'POK' && store.code === 'PDK') ||
+                (s.code === 'PDK' && store.code === 'POK')
+            );
+            if (st) monthlyUnits += (st.dailyAmount || 0);
           }
         });
       }
 
-      // 2. Monthly Calculation (Selected Month)
-      let monthlyUnits = 0;
-      let monthlyAmount = 0;
+      if (monthlyUnits > 0 && avgPrice > 0) {
+        monthlyAmount = monthlyUnits * avgPrice;
+      }
 
       // 3. Yearly Calculation (Selected Year)
-      let yearlyUnits = 0;
+      let yearlyUnits = matchV5?.yearlyAmount || 0;
       let yearlyAmount = 0;
 
-      // Scan all stored dates
-      Object.entries(storedLogs).forEach(([dateStr, itemsMap]) => {
-        if (dateStr.startsWith(yearPrefix)) {
-          // Check manual dispatches for this date
-          const manualDay = storeDispatches[dateStr]?.[store.code];
-
-          if (manualDay && Object.keys(manualDay).length > 0) {
-            Object.entries(manualDay).forEach(([itemId, qty]) => {
-              const item = allItems.find((i) => i.id === itemId);
-              if (item) {
-                const val = qty * item.cpu;
-                yearlyUnits += qty;
-                yearlyAmount += val;
-                if (dateStr.startsWith(monthPrefix)) {
-                  monthlyUnits += qty;
-                  monthlyAmount += val;
-                }
-              }
-            });
-          } else {
-            // Proportional from Commissary
-            storeItems.forEach((item) => {
-              const log = itemsMap[item.id];
-              if (log && log.stock_out > 0) {
-                const storeQty = Math.round(log.stock_out * weight);
-                const val = storeQty * item.cpu;
-                yearlyUnits += storeQty;
-                yearlyAmount += val;
-                if (dateStr.startsWith(monthPrefix)) {
-                  monthlyUnits += storeQty;
-                  monthlyAmount += val;
-                }
-              }
-            });
+      // Scan all stored v5 dates for that year if not manually keyed in
+      if (!yearlyUnits) {
+        Object.entries(v5Stores).forEach(([dStr, sList]) => {
+          if (dStr.startsWith(yearPrefix)) {
+            const st = sList.find(
+              (s) =>
+                s.code === store.code ||
+                (s.code === 'CYH' && store.code === 'CMH') ||
+                (s.code === 'CMH' && store.code === 'CYH') ||
+                (s.code === 'ATN' && store.code === 'RTN') ||
+                (s.code === 'RTN' && store.code === 'ATN') ||
+                (s.code === 'POK' && store.code === 'PDK') ||
+                (s.code === 'PDK' && store.code === 'POK')
+            );
+            if (st) yearlyUnits += (st.dailyAmount || 0);
           }
-        }
-      });
+        });
+      }
 
-      // Total Inventory Valuation allocated to this store
-      const storeTotalStockValue = storeItems.reduce((acc, i) => acc + i.opening_stock * i.cpu, 0);
+      if (yearlyUnits > 0 && avgPrice > 0) {
+        yearlyAmount = yearlyUnits * avgPrice;
+      }
+
+      // Total Inventory Valuation allocated to this store (0 by default)
+      let storeTotalStockValue = 0;
+      const dayStock = v5Stock[selectedDateStr];
+      if (dayStock) {
+        dayStock.forEach((i) => {
+          if (i.brand === (store.brand === 'TUBE_COFFEE' ? 'Tube Coffee' : 'OnMart')) {
+            const bal = i.opening_stock + i.stock_in - i.stock_out;
+            if (bal > 0 && i.cpu > 0) {
+              storeTotalStockValue += (bal * i.cpu) * (1 / (store.brand === 'TUBE_COFFEE' ? 9 : 4));
+            }
+          }
+        });
+      }
 
       return {
         ...store,
@@ -287,7 +328,7 @@ export default function SummaryPage() {
         storeTotalStockValue,
       };
     });
-  }, [allItems, storedLogs, storeDispatches, selectedDateStr, selectedYear, selectedMonth]);
+  }, [allItems, storeDispatches, v5Stores, v5Stock, v5Prices, selectedDateStr, selectedYear, selectedMonth]);
 
   // Overall Totals
   const overallTotals = useMemo(() => {
@@ -536,7 +577,7 @@ export default function SummaryPage() {
           </div>
           <div className="text-2xl font-black text-emerald-700">
             {overallTotals.dailyUnits.toLocaleString()}{' '}
-            <span className="text-xs font-normal text-slate-500">units delivered</span>
+            <span className="text-xs font-normal text-slate-500">items delivered</span>
           </div>
           <div className="mt-2 text-[11px] text-slate-500 flex justify-between pt-2 border-t border-slate-100 font-bold">
             <span>Total Value Today:</span>
@@ -556,7 +597,7 @@ export default function SummaryPage() {
           </div>
           <div className="text-2xl font-black text-indigo-700">
             {overallTotals.monthlyUnits.toLocaleString()}{' '}
-            <span className="text-xs font-normal text-slate-500">units in {MONTHS[selectedMonth - 1].nameEn}</span>
+            <span className="text-xs font-normal text-slate-500">items in {MONTHS[selectedMonth - 1].nameEn}</span>
           </div>
           <div className="mt-2 text-[11px] text-slate-500 flex justify-between pt-2 border-t border-slate-100 font-bold">
             <span>Total Month Value:</span>
@@ -576,7 +617,7 @@ export default function SummaryPage() {
           </div>
           <div className="text-2xl font-black text-amber-700">
             {overallTotals.yearlyUnits.toLocaleString()}{' '}
-            <span className="text-xs font-normal text-slate-500">units in {selectedYear}</span>
+            <span className="text-xs font-normal text-slate-500">items in {selectedYear}</span>
           </div>
           <div className="mt-2 text-[11px] text-slate-500 flex justify-between pt-2 border-t border-slate-100 font-bold">
             <span>Total Year Value:</span>
@@ -595,7 +636,7 @@ export default function SummaryPage() {
             </div>
           </div>
           <div className="text-xl font-black text-amber-300 truncate">
-            {topStoreMonthly?.name || 'KPI'}
+            {topStoreMonthly && topStoreMonthly.monthlyUnits > 0 ? topStoreMonthly.name : 'គ្មានទិន្នន័យ'}
           </div>
           <div className="mt-2 text-[11px] text-slate-400 flex justify-between pt-2 border-t border-slate-800 font-medium">
             <span>Monthly Received:</span>
@@ -617,7 +658,7 @@ export default function SummaryPage() {
               </span>
             </h3>
             <span className="text-xs font-bold text-slate-500">
-              សរុបថ្ងៃនេះ៖ <strong className="text-emerald-700">{overallTotals.dailyUnits} Units</strong> (
+              សរុបថ្ងៃនេះ៖ <strong className="text-emerald-700">{overallTotals.dailyUnits} Items</strong> (
               <strong className="text-slate-900">${overallTotals.dailyAmount.toFixed(2)}</strong>)
             </span>
           </div>
@@ -678,7 +719,7 @@ export default function SummaryPage() {
                       </span>
                       <span className="text-lg font-black text-slate-900">
                         {data?.dailyUnits || 0}{' '}
-                        <span className="text-[11px] font-normal text-slate-500">units</span>
+                        <span className="text-[11px] font-normal text-slate-500">items</span>
                       </span>
                     </div>
 
@@ -721,7 +762,7 @@ export default function SummaryPage() {
               </span>
             </h3>
             <span className="text-xs font-bold text-slate-500">
-              សរុបប្រចាំខែ៖ <strong className="text-indigo-700">{overallTotals.monthlyUnits} Units</strong> (
+              សរុបប្រចាំខែ៖ <strong className="text-indigo-700">{overallTotals.monthlyUnits} Items</strong> (
               <strong className="text-slate-900">${overallTotals.monthlyAmount.toFixed(2)}</strong>)
             </span>
           </div>
@@ -772,7 +813,7 @@ export default function SummaryPage() {
                       </span>
                       <span className="text-lg font-black text-slate-900">
                         {data?.monthlyUnits || 0}{' '}
-                        <span className="text-[11px] font-normal text-slate-500">units</span>
+                        <span className="text-[11px] font-normal text-slate-500">items</span>
                       </span>
                     </div>
 
@@ -814,7 +855,7 @@ export default function SummaryPage() {
               </span>
             </h3>
             <span className="text-xs font-bold text-slate-500">
-              សរុបប្រចាំឆ្នាំ {selectedYear}៖ <strong className="text-amber-700">{overallTotals.yearlyUnits} Units</strong> (
+              សរុបប្រចាំឆ្នាំ {selectedYear}៖ <strong className="text-amber-700">{overallTotals.yearlyUnits} Items</strong> (
               <strong className="text-slate-900">${overallTotals.yearlyAmount.toFixed(2)}</strong>)
             </span>
           </div>
@@ -865,7 +906,7 @@ export default function SummaryPage() {
                       </span>
                       <span className="text-lg font-black text-slate-900">
                         {data?.yearlyUnits || 0}{' '}
-                        <span className="text-[11px] font-normal text-slate-500">units</span>
+                        <span className="text-[11px] font-normal text-slate-500">items</span>
                       </span>
                     </div>
 
@@ -988,7 +1029,7 @@ export default function SummaryPage() {
                       {/* Daily Received */}
                       <td className="py-3 px-3 text-right bg-emerald-50/20 font-mono">
                         <div className="font-bold text-slate-900">
-                          {data?.dailyUnits || 0} units
+                          {data?.dailyUnits || 0} items
                         </div>
                         <div className="text-[11px] font-black text-emerald-700">
                           ${(data?.dailyAmount || 0).toFixed(2)}
@@ -998,7 +1039,7 @@ export default function SummaryPage() {
                       {/* Monthly Received */}
                       <td className="py-3 px-3 text-right bg-indigo-50/20 font-mono">
                         <div className="font-bold text-slate-900">
-                          {data?.monthlyUnits || 0} units
+                          {data?.monthlyUnits || 0} items
                         </div>
                         <div className="text-[11px] font-black text-indigo-700">
                           ${(data?.monthlyAmount || 0).toFixed(2)}
@@ -1008,7 +1049,7 @@ export default function SummaryPage() {
                       {/* Yearly Received */}
                       <td className="py-3 px-3 text-right bg-amber-50/20 font-mono">
                         <div className="font-bold text-slate-900">
-                          {data?.yearlyUnits || 0} units
+                          {data?.yearlyUnits || 0} items
                         </div>
                         <div className="text-[11px] font-black text-amber-700">
                           ${(data?.yearlyAmount || 0).toFixed(2)}
@@ -1042,13 +1083,13 @@ export default function SummaryPage() {
                     105 Items
                   </td>
                   <td className="py-3 px-3 text-right font-mono font-black text-emerald-900">
-                    {overallTotals.dailyUnits} units • ${overallTotals.dailyAmount.toFixed(2)}
+                    {overallTotals.dailyUnits} items • ${overallTotals.dailyAmount.toFixed(2)}
                   </td>
                   <td className="py-3 px-3 text-right font-mono font-black text-indigo-900">
-                    {overallTotals.monthlyUnits} units • ${overallTotals.monthlyAmount.toFixed(2)}
+                    {overallTotals.monthlyUnits} items • ${overallTotals.monthlyAmount.toFixed(2)}
                   </td>
                   <td className="py-3 px-3 text-right font-mono font-black text-amber-900">
-                    {overallTotals.yearlyUnits} units • ${overallTotals.yearlyAmount.toFixed(2)}
+                    {overallTotals.yearlyUnits} items • ${overallTotals.yearlyAmount.toFixed(2)}
                   </td>
                   <td className="py-3 px-3 text-right font-black font-mono text-emerald-900">
                     ${overallTotals.totalValuation.toLocaleString('en-US', {
