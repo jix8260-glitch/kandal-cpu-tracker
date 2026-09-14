@@ -139,10 +139,15 @@ const STORAGE_STOCK_BY_DATE_KEY = "kandal_cpu_stock_by_date_v5";
 const STORAGE_ITEM_PRICES_KEY = "kandal_cpu_item_prices_v5";
 
 export default function StandardInventoryDashboard() {
-  const [activeTab, setActiveTab] = useState<"stores" | "stock" | "history">("stock");
+  const [activeTab, setActiveTab] = useState<"stores" | "stock">("stock");
   const [selectedBrand, setSelectedBrand] = useState<"ALL" | "Tube Coffee" | "OnMart">("ALL");
-  const [storePeriod, setStorePeriod] = useState<"daily" | "monthly" | "yearly">("monthly");
   
+  // Manager PIN & Price Visibility state (0203 reveals prices, 8899 or default hides prices)
+  const [isManager, setIsManager] = useState<boolean>(false);
+  const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
+  const [pinInput, setPinInput] = useState<string>("");
+  const [pinError, setPinError] = useState<string>("");
+
   // DATE SELECTION FOR KEY IN
   const [selectedDate, setSelectedDate] = useState<string>(getTodayDateString());
 
@@ -283,6 +288,10 @@ export default function StandardInventoryDashboard() {
 
       const savedPrices = localStorage.getItem(STORAGE_ITEM_PRICES_KEY);
       if (savedPrices) setItemPrices(JSON.parse(savedPrices));
+
+      if (localStorage.getItem("kandal_manager_mode") === "true") {
+        setIsManager(true);
+      }
     } catch (e) {
       console.error("Failed to load inventory data", e);
     }
@@ -454,26 +463,59 @@ export default function StandardInventoryDashboard() {
     }
   };
 
-  // TOP 5 STORES (Ranked by active period amount for selected date)
-  const top5Stores = useMemo(() => {
-    const sortField = storePeriod === "daily" ? "dailyAmount" : storePeriod === "monthly" ? "monthlyAmount" : "yearlyAmount";
+  // TOP 2 TUBE COFFEE+ AND TOP 2 ONMART STORES (Ranked by Daily Items for selected date)
+  const top2TubeStores = useMemo(() => {
     return [...currentStores]
-      .sort((a, b) => b[sortField] - a[sortField])
-      .slice(0, 5);
-  }, [currentStores, storePeriod]);
+      .filter((s) => s.brand === "Tube Coffee")
+      .sort((a, b) => b.dailyAmount - a.dailyAmount)
+      .slice(0, 2);
+  }, [currentStores]);
 
-  const maxStoreAmount = useMemo(() => {
-    const sortField = storePeriod === "daily" ? "dailyAmount" : storePeriod === "monthly" ? "monthlyAmount" : "yearlyAmount";
-    return top5Stores[0]?.[sortField] || 1;
-  }, [top5Stores, storePeriod]);
+  const top2OnMartStores = useMemo(() => {
+    return [...currentStores]
+      .filter((s) => s.brand === "OnMart")
+      .sort((a, b) => b.dailyAmount - a.dailyAmount)
+      .slice(0, 2);
+  }, [currentStores]);
+
+  const maxTubeAmount = useMemo(() => top2TubeStores[0]?.dailyAmount || 1, [top2TubeStores]);
+  const maxOnMartAmount = useMemo(() => top2OnMartStores[0]?.dailyAmount || 1, [top2OnMartStores]);
 
   const storeTotalsSum = useMemo(() => {
+    const tubeSum = currentStores.filter((s) => s.brand === "Tube Coffee").reduce((acc, s) => acc + s.dailyAmount, 0);
+    const onmartSum = currentStores.filter((s) => s.brand === "OnMart").reduce((acc, s) => acc + s.dailyAmount, 0);
     return {
       daily: currentStores.reduce((acc, s) => acc + s.dailyAmount, 0),
-      monthly: currentStores.reduce((acc, s) => acc + s.monthlyAmount, 0),
-      yearly: currentStores.reduce((acc, s) => acc + s.yearlyAmount, 0),
+      tubeDaily: tubeSum,
+      onmartDaily: onmartSum,
     };
   }, [currentStores]);
+
+  // Manager PIN & Mode Handlers (0203 reveals prices, 8899 hides prices)
+  const handlePinSubmit = () => {
+    setPinError("");
+    if (pinInput === "0203") {
+      setIsManager(true);
+      setIsPinModalOpen(false);
+      setPinInput("");
+      try { localStorage.setItem("kandal_manager_mode", "true"); } catch (e) {}
+      triggerNotification("✅ បានចូល Manager Mode ជោគជ័យ! បង្ហាញព័ត៌មានតម្លៃ CPU ទាំងអស់");
+    } else if (pinInput === "8899") {
+      setIsManager(false);
+      setIsPinModalOpen(false);
+      setPinInput("");
+      try { localStorage.removeItem("kandal_manager_mode"); } catch (e) {}
+      triggerNotification("ℹ️ កូដ 8899៖ របៀបបុគ្គលិកទូទៅ (លាក់តម្លៃ រក្សាការវាយបញ្ចូលធម្មតា)");
+    } else {
+      setPinError("លេខកូដមិនត្រឹមត្រូវ! (Manager: 0203, បុគ្គលិក: 8899)");
+    }
+  };
+
+  const handleLogoutManager = () => {
+    setIsManager(false);
+    try { localStorage.removeItem("kandal_manager_mode"); } catch (e) {}
+    triggerNotification("🔒 បានចាកចេញពី Manager Mode! តម្លៃត្រូវបានលាក់វិញ");
+  };
 
   // Filtered lists
   const filteredStockItems = useMemo(() => {
@@ -642,33 +684,9 @@ export default function StandardInventoryDashboard() {
               <Store className="w-4 h-4" />
               <span>សរុបតាមសាខា (Store Totals)</span>
             </button>
-            <button
-              onClick={() => { setActiveTab("history"); setSearchTerm(""); }}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
-                activeTab === "history"
-                  ? "bg-white text-purple-700 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <History className="w-4 h-4 text-purple-600" />
-              <span>ប្រវត្តិ &amp; តាមដាន Live Sync</span>
-              {auditLogs.length > 0 && (
-                <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-purple-100 text-purple-800">
-                  {auditLogs.length}
-                </span>
-              )}
-            </button>
           </div>
 
-          <button
-            onClick={() => setIsReferenceOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all shadow-xs"
-            title="បើកមើលសៀវភៅណែនាំ & REFERENCE ផ្លូវការ"
-          >
-            <FileText className="w-4 h-4 text-emerald-600" />
-            <span>REFERENCE ឯកសារយោង</span>
-          </button>
-
+          {/* SINGLE STORE SUMMARY LINK */}
           <Link
             href="/summary"
             className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all shadow-xs"
@@ -677,6 +695,26 @@ export default function StandardInventoryDashboard() {
             <BarChart3 className="w-4 h-4 text-indigo-600" />
             <span>Store Summary ↗</span>
           </Link>
+
+          {/* MANAGER PIN ACCESS BUTTON */}
+          {isManager ? (
+            <button
+              onClick={handleLogoutManager}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 transition-all shadow-xs"
+              title="Manager Mode កំពុងបើក (ចុចដើម្បីចាកចេញ/លាក់តម្លៃ)"
+            >
+              <span>👑 Manager (0203)</span>
+              <span className="text-[10px] bg-amber-200 px-1.5 py-0.5 rounded text-amber-800">ចាកចេញ</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => { setPinInput(""); setPinError(""); setIsPinModalOpen(true); }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-all shadow-xs"
+              title="ចូលមើលតម្លៃ (សម្រាប់ Manager: 0203)"
+            >
+              <span>🔐 Manager</span>
+            </button>
+          )}
         </div>
       </header>
 
@@ -776,16 +814,31 @@ export default function StandardInventoryDashboard() {
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500 font-medium">តម្លៃស្តុកបច្ចុប្បន្ន (Valuation)</p>
-                <p className="text-2xl font-bold text-slate-800 mt-1">${stockSummary.totalValue.toFixed(2)}</p>
-                <span className="text-xs text-emerald-600 font-medium">Live CPU Calculation</span>
+            {isManager ? (
+              <div className="bg-white p-5 rounded-2xl border border-amber-200/80 bg-amber-50/20 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-amber-800 font-bold flex items-center gap-1">
+                    <span>👑 តម្លៃស្តុកបច្ចុប្បន្ន (Valuation)</span>
+                  </p>
+                  <p className="text-2xl font-bold text-slate-800 mt-1">${stockSummary.totalValue.toFixed(2)}</p>
+                  <span className="text-xs text-emerald-600 font-semibold">Manager CPU Calculation ($)</span>
+                </div>
+                <div className="w-12 h-12 bg-amber-100 text-amber-800 rounded-xl flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6" />
+                </div>
               </div>
-              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-                <TrendingUp className="w-6 h-6" />
+            ) : (
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-500 font-medium">មុខទំនិញសរុប (Total Items)</p>
+                  <p className="text-2xl font-bold text-indigo-700 mt-1">{currentStockItems.length} មុខ</p>
+                  <span className="text-xs text-slate-400">Tube Coffee+ (69) &amp; OnMart (36)</span>
+                </div>
+                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                  <Boxes className="w-6 h-6" />
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
               <div>
@@ -930,12 +983,20 @@ export default function StandardInventoryDashboard() {
                     <th className="p-3">ឈ្មោះទំនិញ (Khmer)</th>
                     <th className="p-3">Brand</th>
                     <th className="p-3">UOM</th>
-                    <th className="p-3 text-center bg-slate-100/60 text-slate-800">តម្លៃ/CPU ($)</th>
+                    {isManager && (
+                      <th className="p-3 text-center bg-amber-50/80 text-amber-900 border-x border-amber-200/80">
+                        👑 តម្លៃ/CPU ($)
+                      </th>
+                    )}
                     <th className="p-3 text-center bg-slate-100/60 text-slate-800">ដើមគ្រា (Opening)</th>
                     <th className="p-3 text-center bg-emerald-50/50 text-emerald-800">ស្តុកចូល (Stock In)</th>
                     <th className="p-3 text-center bg-rose-50/50 text-rose-800">ស្តុកចេញ (Stock Out)</th>
                     <th className="p-3 text-right">ស្តុកសល់ (Balance)</th>
-                    <th className="p-3 text-right">តម្លៃសរុប ($)</th>
+                    {isManager && (
+                      <th className="p-3 text-right bg-amber-50/80 text-amber-900 border-l border-amber-200/80">
+                        👑 តម្លៃសរុប ($)
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -956,24 +1017,26 @@ export default function StandardInventoryDashboard() {
                         </td>
                         <td className="p-3 text-slate-500 text-xs">{item.uom}</td>
 
-                        {/* CPU / Price Input */}
-                        <td className="p-2 text-center bg-slate-50/40">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            inputMode="decimal"
-                            placeholder="0"
-                            value={item.cpu === 0 ? "" : item.cpu}
-                            onFocus={(e) => e.target.select()}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              const num = v === "" ? 0 : parseFloat(v);
-                              handleStockNumberChange(item.item_code, "cpu", isNaN(num) ? 0 : num);
-                            }}
-                            className="w-18 px-2 py-1 text-center font-bold text-slate-800 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-xs"
-                          />
-                        </td>
+                        {/* CPU / Price Input - ONLY VISIBLE IF MANAGER (0203) */}
+                        {isManager && (
+                          <td className="p-2 text-center bg-amber-50/30 border-x border-amber-100">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              placeholder="0"
+                              value={item.cpu === 0 ? "" : item.cpu}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                const num = v === "" ? 0 : parseFloat(v);
+                                handleStockNumberChange(item.item_code, "cpu", isNaN(num) ? 0 : num);
+                              }}
+                              className="w-18 px-2 py-1 text-center font-bold text-slate-800 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none text-xs bg-white"
+                            />
+                          </td>
+                        )}
 
                         {/* Opening Stock Input */}
                         <td className="p-2 text-center bg-slate-50/40">
@@ -1034,10 +1097,12 @@ export default function StandardInventoryDashboard() {
                           {balance.toLocaleString()} items
                         </td>
 
-                        {/* Valuation */}
-                        <td className="p-3 text-right font-bold text-xs text-slate-700">
-                          ${value.toFixed(2)}
-                        </td>
+                        {/* Valuation - ONLY VISIBLE IF MANAGER (0203) */}
+                        {isManager && (
+                          <td className="p-3 text-right font-bold text-xs text-amber-950 bg-amber-50/20 border-l border-amber-100">
+                            ${value.toFixed(2)}
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
@@ -1054,11 +1119,11 @@ export default function StandardInventoryDashboard() {
       {activeTab === "stores" && (
         <div className="space-y-6 animate-fadeIn">
 
-          {/* KPI STAT CARDS FOR STORES */}
+          {/* KPI STAT CARDS FOR STORES (DAILY ITEMS ONLY) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
               <div>
-                <p className="text-xs text-slate-500 font-medium">សរុបប្រចាំថ្ងៃ (Daily Total)</p>
+                <p className="text-xs text-slate-500 font-medium">សរុបប្រចាំថ្ងៃ (Daily Total Items)</p>
                 <p className="text-2xl font-bold text-emerald-600 mt-1">{storeTotalsSum.daily.toLocaleString()} items</p>
                 <span className="text-xs text-slate-400">ចែកចាយថ្ងៃ {selectedDate} (13 ហាង)</span>
               </div>
@@ -1069,36 +1134,38 @@ export default function StandardInventoryDashboard() {
 
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
               <div>
-                <p className="text-xs text-slate-500 font-medium">សរុបប្រចាំខែ (Monthly Total)</p>
-                <p className="text-2xl font-bold text-indigo-600 mt-1">{storeTotalsSum.monthly.toLocaleString()} items</p>
-                <span className="text-xs text-slate-400">ខែនេះ (Current Month)</span>
+                <p className="text-xs text-slate-500 font-medium">Tube Coffee+ សរុបថ្ងៃនេះ</p>
+                <p className="text-2xl font-bold text-amber-700 mt-1">{storeTotalsSum.tubeDaily.toLocaleString()} items</p>
+                <span className="text-xs text-amber-600 font-medium">សរុប 9 ហាង ({selectedDate})</span>
               </div>
-              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-                <Calendar className="w-6 h-6" />
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500 font-medium">សរុបប្រចាំឆ្នាំ (Yearly Total)</p>
-                <p className="text-2xl font-bold text-slate-800 mt-1">{storeTotalsSum.yearly.toLocaleString()} items</p>
-                <span className="text-xs text-slate-400">ឆ្នាំនេះ (Year-To-Date)</span>
-              </div>
-              <div className="w-12 h-12 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center">
-                <BarChart3 className="w-6 h-6" />
+              <div className="w-12 h-12 bg-amber-50 text-amber-700 rounded-xl flex items-center justify-center">
+                <Coffee className="w-6 h-6" />
               </div>
             </div>
 
             <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
               <div>
-                <p className="text-xs text-slate-500 font-medium">សាខាលំដាប់លេខ ១ (Top 1 Store)</p>
+                <p className="text-xs text-slate-500 font-medium">OnMart សរុបថ្ងៃនេះ</p>
+                <p className="text-2xl font-bold text-blue-700 mt-1">{storeTotalsSum.onmartDaily.toLocaleString()} items</p>
+                <span className="text-xs text-blue-600 font-medium">សរុប 4 ហាង ({selectedDate})</span>
+              </div>
+              <div className="w-12 h-12 bg-blue-50 text-blue-700 rounded-xl flex items-center justify-center">
+                <ShoppingBag className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500 font-medium">សាខាលំដាប់លេខ ១ ថ្ងៃនេះ</p>
                 <p className="text-base font-bold text-slate-800 truncate mt-1">
-                  {top5Stores[0] && (storePeriod === "daily" ? top5Stores[0].dailyAmount : storePeriod === "monthly" ? top5Stores[0].monthlyAmount : top5Stores[0].yearlyAmount) > 0
-                    ? top5Stores[0].name 
+                  {top2TubeStores[0] && top2OnMartStores[0] 
+                    ? (top2TubeStores[0].dailyAmount >= top2OnMartStores[0].dailyAmount 
+                        ? top2TubeStores[0].name 
+                        : top2OnMartStores[0].name)
                     : "គ្មានទិន្នន័យ"}
                 </p>
                 <span className="text-xs text-amber-600 font-semibold">
-                  {storePeriod === "daily" ? top5Stores[0]?.dailyAmount : storePeriod === "monthly" ? top5Stores[0]?.monthlyAmount : top5Stores[0]?.yearlyAmount} items ({storePeriod})
+                  {Math.max(top2TubeStores[0]?.dailyAmount || 0, top2OnMartStores[0]?.dailyAmount || 0).toLocaleString()} items ថ្ងៃនេះ
                 </span>
               </div>
               <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
@@ -1107,98 +1174,119 @@ export default function StandardInventoryDashboard() {
             </div>
           </div>
 
-          {/* TOP 5 STORES MOST ORDER */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+          {/* TOP STORES: TUBE COFFEE+ (TOP 2) & ONMART (TOP 2) */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2">
                   <Award className="w-5 h-5 text-amber-500" />
-                  តារាងចំណាត់ថ្នាក់ TOP 5 STORES MOST ORDER (សាខាបញ្ជាទិញច្រើនជាងគេ)
+                  <span>តារាងចំណាត់ថ្នាក់ TOP STORES (TUBE 2 ហាង &amp; ONMART 2 ហាង)</span>
                 </h2>
-                <p className="text-xs text-slate-500">គិតតាមចំនួន items សរុបដែលបានចែកចាយទៅសាខា</p>
+                <p className="text-xs text-slate-500">
+                  គិតតាមចំនួន items សរុបប្រចាំថ្ងៃ ({selectedDate})
+                </p>
               </div>
-
-              {/* Period Selector for Ranking */}
-              <div className="inline-flex rounded-lg border border-slate-200 p-1 bg-slate-50 text-xs font-semibold">
-                <button
-                  onClick={() => setStorePeriod("daily")}
-                  className={`px-3 py-1.5 rounded-md transition-all ${storePeriod === "daily" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"}`}
-                >
-                  Daily
-                </button>
-                <button
-                  onClick={() => setStorePeriod("monthly")}
-                  className={`px-3 py-1.5 rounded-md transition-all ${storePeriod === "monthly" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500"}`}
-                >
-                  Monthly
-                </button>
-                <button
-                  onClick={() => setStorePeriod("yearly")}
-                  className={`px-3 py-1.5 rounded-md transition-all ${storePeriod === "yearly" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500"}`}
-                >
-                  Yearly
-                </button>
-              </div>
+              <span className="text-xs font-bold px-3 py-1 bg-slate-100 text-slate-700 rounded-full border border-slate-200">
+                Top 2 តាម Brand នីមួយៗ
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              {top5Stores.map((store, index) => {
-                const amount = storePeriod === "daily" ? store.dailyAmount : storePeriod === "monthly" ? store.monthlyAmount : store.yearlyAmount;
-                const percent = maxStoreAmount > 0 ? Math.round((amount / maxStoreAmount) * 100) : 0;
-
-                return (
-                  <div
-                    key={store.id}
-                    className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/70 flex flex-col justify-between hover:bg-slate-100/70 transition-all"
-                  >
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${
-                        index === 0 ? "bg-amber-400 text-white" :
-                        index === 1 ? "bg-slate-300 text-slate-800" :
-                        index === 2 ? "bg-amber-700 text-white" :
-                        "bg-slate-200 text-slate-600"
-                      }`}>
-                        #{index + 1}
-                      </span>
-                      <span className="text-xs font-bold text-slate-500 bg-white px-2 py-0.5 rounded border border-slate-200">
-                        {store.code}
-                      </span>
-                    </div>
-
-                    <div className="my-1">
-                      <p className="font-bold text-sm text-slate-800 line-clamp-1" title={store.name}>
-                        {store.name}
-                      </p>
-                      <p className="text-xs text-slate-400">{store.brand}</p>
-                    </div>
-
-                    <div className="mt-2 pt-2 border-t border-slate-200/60">
-                      <div className="flex justify-between items-center text-xs mb-1">
-                        <span className="text-slate-400 capitalize">{storePeriod}:</span>
-                        <span className="font-bold text-indigo-700">{amount.toLocaleString()} items</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Tube Coffee+ Top 2 */}
+              <div className="bg-amber-50/40 rounded-xl p-4 border border-amber-200/70">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                    <Coffee className="w-4 h-4 text-amber-700" />
+                    Tube Coffee+ (Top 2)
+                  </span>
+                  <span className="text-[11px] font-semibold text-amber-700 bg-white px-2 py-0.5 rounded border border-amber-200">
+                    9 Stores Roster
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {top2TubeStores.map((store, idx) => {
+                    const percent = maxTubeAmount > 0 ? Math.round((store.dailyAmount / maxTubeAmount) * 100) : 0;
+                    return (
+                      <div key={store.id} className="bg-white p-3.5 rounded-xl border border-amber-100 shadow-xs">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${
+                            idx === 0 ? "bg-amber-500 text-white" : "bg-amber-200 text-amber-900"
+                          }`}>
+                            #{idx + 1}
+                          </span>
+                          <span className="text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                            {store.code}
+                          </span>
+                        </div>
+                        <p className="font-bold text-sm text-slate-800 truncate" title={store.name}>{store.name}</p>
+                        <div className="mt-2 pt-2 border-t border-slate-100">
+                          <div className="flex justify-between items-center text-xs mb-1">
+                            <span className="text-slate-400">ថ្ងៃនេះ:</span>
+                            <span className="font-bold text-amber-800">{store.dailyAmount.toLocaleString()} items</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div className="h-full bg-amber-500 rounded-full" style={{ width: `${percent}%` }} />
+                          </div>
+                        </div>
                       </div>
-                      <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full rounded-full ${store.brand === "Tube Coffee" ? "bg-amber-500" : "bg-blue-500"}`} 
-                          style={{ width: `${percent}%` }} 
-                        />
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* OnMart Top 2 */}
+              <div className="bg-blue-50/40 rounded-xl p-4 border border-blue-200/70">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-blue-900 flex items-center gap-1.5">
+                    <ShoppingBag className="w-4 h-4 text-blue-700" />
+                    OnMart (Top 2)
+                  </span>
+                  <span className="text-[11px] font-semibold text-blue-700 bg-white px-2 py-0.5 rounded border border-blue-200">
+                    4 Stores Roster
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {top2OnMartStores.map((store, idx) => {
+                    const percent = maxOnMartAmount > 0 ? Math.round((store.dailyAmount / maxOnMartAmount) * 100) : 0;
+                    return (
+                      <div key={store.id} className="bg-white p-3.5 rounded-xl border border-blue-100 shadow-xs">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs ${
+                            idx === 0 ? "bg-blue-600 text-white" : "bg-blue-200 text-blue-900"
+                          }`}>
+                            #{idx + 1}
+                          </span>
+                          <span className="text-xs font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            {store.code}
+                          </span>
+                        </div>
+                        <p className="font-bold text-sm text-slate-800 truncate" title={store.name}>{store.name}</p>
+                        <div className="mt-2 pt-2 border-t border-slate-100">
+                          <div className="flex justify-between items-center text-xs mb-1">
+                            <span className="text-slate-400">ថ្ងៃនេះ:</span>
+                            <span className="font-bold text-blue-800">{store.dailyAmount.toLocaleString()} items</span>
+                          </div>
+                          <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-600 rounded-full" style={{ width: `${percent}%` }} />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* STORE TOTALS TABLE (SHOW DAILY, MONTHLY, YEARLY AMOUNTS ONLY - NO ITEMS) */}
+          {/* STORE TOTALS TABLE (DAILY ITEMS KEY IN ONLY) */}
           <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
               <div>
                 <h2 className="text-lg font-bold text-slate-800">
-                  តារាងបរិមាណសរុបតាមសាខា (13 Stores: Daily, Monthly, Yearly)
+                  តារាងបរិមាណសរុបតាមសាខា (13 Stores: Daily Items Key In)
                 </h2>
                 <p className="text-xs text-slate-500">
-                  កាលបរិច្ឆេទ៖ <span className="font-bold text-indigo-700">{selectedDate}</span> — បញ្ចូលចំនួន items សរុបប្រចាំថ្ងៃ និងប្រចាំខែ
+                  កាលបរិច្ឆេទ៖ <span className="font-bold text-indigo-700">{selectedDate}</span> — បញ្ចូលចំនួន items សរុបប្រចាំថ្ងៃ (សម្រាប់របាយការណ៍សរុបខែ/ឆ្នាំ សូមចូល Store Summary ខាងលើ)
                 </p>
               </div>
 
@@ -1245,10 +1333,8 @@ export default function StandardInventoryDashboard() {
                     <th className="p-3">ឈ្មោះសាខា (Store Name)</th>
                     <th className="p-3">Brand</th>
                     <th className="p-3 text-center bg-emerald-50/40 text-emerald-800">
-                      សរុបប្រចាំថ្ងៃ ({selectedDate})
+                      សរុបប្រចាំថ្ងៃ ({selectedDate}) (items)
                     </th>
-                    <th className="p-3 text-center bg-indigo-50/40 text-indigo-800">សរុបប្រចាំខែ (Monthly Amount)</th>
-                    <th className="p-3 text-center bg-slate-100/60 text-slate-800">សរុបប្រចាំឆ្នាំ (Yearly Amount)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1268,7 +1354,7 @@ export default function StandardInventoryDashboard() {
                         </span>
                       </td>
                       
-                      {/* Daily Amount Input */}
+                      {/* Daily Amount Input Only */}
                       <td className="p-2 text-center bg-emerald-50/20">
                         <input
                           type="number"
@@ -1282,43 +1368,7 @@ export default function StandardInventoryDashboard() {
                             const num = v === "" ? 0 : parseInt(v, 10);
                             handleStoreAmountChange(store.id, "dailyAmount", isNaN(num) ? 0 : num);
                           }}
-                          className="w-24 px-2 py-1 text-center font-bold text-emerald-700 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-xs"
-                        />
-                      </td>
-
-                      {/* Monthly Amount Input */}
-                      <td className="p-2 text-center bg-indigo-50/20">
-                        <input
-                          type="number"
-                          min="0"
-                          inputMode="numeric"
-                          placeholder="0"
-                          value={store.monthlyAmount === 0 ? "" : store.monthlyAmount}
-                          onFocus={(e) => e.target.select()}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            const num = v === "" ? 0 : parseInt(v, 10);
-                            handleStoreAmountChange(store.id, "monthlyAmount", isNaN(num) ? 0 : num);
-                          }}
-                          className="w-24 px-2 py-1 text-center font-bold text-indigo-700 border border-indigo-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs"
-                        />
-                      </td>
-
-                      {/* Yearly Amount Input */}
-                      <td className="p-2 text-center bg-slate-50/40">
-                        <input
-                          type="number"
-                          min="0"
-                          inputMode="numeric"
-                          placeholder="0"
-                          value={store.yearlyAmount === 0 ? "" : store.yearlyAmount}
-                          onFocus={(e) => e.target.select()}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            const num = v === "" ? 0 : parseInt(v, 10);
-                            handleStoreAmountChange(store.id, "yearlyAmount", isNaN(num) ? 0 : num);
-                          }}
-                          className="w-28 px-2 py-1 text-center font-bold text-slate-700 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs"
+                          className="w-32 px-3 py-1.5 text-center font-bold text-emerald-700 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none text-xs"
                         />
                       </td>
                     </tr>
@@ -1331,355 +1381,68 @@ export default function StandardInventoryDashboard() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 3: UPDATE HISTORY & CONCURRENT AUDIT TRAIL */}
+      {/* MANAGER ACCESS / PIN CODE MODAL (0203 for Manager, 8899 for Staff) */}
       {/* ========================================================================= */}
-      {activeTab === "history" && (
-        <div className="space-y-6 animate-fadeIn">
-
-          {/* KPI STAT CARDS FOR AUDIT TRAIL & CONCURRENCY */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500 font-medium">ស្ថានភាពដំណើរការព្រមគ្នា (Live Sync)</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-base font-bold text-emerald-700">កំពុង Sync ស្វ័យប្រវត្តិ</span>
-                </div>
-                <span className="text-xs text-slate-400">Phone 📱 &amp; PC 💻 Auto-Sync (15s)</span>
-              </div>
-              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
-                <Users className="w-6 h-6" />
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500 font-medium">កាលបរិច្ឆេទដែលបានកត់ត្រា (Saved Days)</p>
-                <p className="text-2xl font-bold text-indigo-600 mt-1">{savedDatesList.length} ថ្ងៃ</p>
-                <span className="text-xs text-slate-400">រក្សាទុកអចិន្ត្រៃយ៍លើ Cloud</span>
-              </div>
-              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
-                <Calendar className="w-6 h-6" />
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500 font-medium">កំណត់ត្រា Audit Logs សរុប</p>
-                <p className="text-2xl font-bold text-purple-600 mt-1">{auditLogs.length} Records</p>
-                <span className="text-xs text-slate-400">តាមដានរាល់ការចុច Save</span>
-              </div>
-              <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center">
-                <History className="w-6 h-6" />
-              </div>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500 font-medium">ម៉ោង Sync ចុងក្រោយ (Last Sync)</p>
-                <p className="text-lg font-bold text-slate-800 mt-1">{lastSyncedTime || "Ready"}</p>
-                <span className="text-xs text-emerald-600 font-semibold">Cloud Synced ✓</span>
-              </div>
-              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
-                <Clock className="w-6 h-6" />
-              </div>
-            </div>
-          </div>
-
-          {/* AUDIT LOG TABLE & ARCHIVE */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <History className="w-5 h-5 text-purple-600" />
-                  <span>តារាងតាមដានប្រវត្តិនៃការកែប្រែទិន្នន័យ (Audit Trail &amp; Update History)</span>
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  តាមដានរាល់ការកែប្រែ ឬការដាក់ទិន្នន័យចូលដែលបានដំណើរការព្រមគ្នាលើ Phone &amp; PC (រក្សាទុកជាអចិន្ត្រៃយ៍)
-                </p>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-                <div className="relative flex-1 sm:w-64">
-                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    placeholder="ស្វែងរកតាមកាលបរិច្ឆេទ / ឧបករណ៍..."
-                    value={historySearchTerm}
-                    onChange={(e) => setHistorySearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-
-                <button
-                  onClick={handleCopyBackup}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200 active:scale-95"
-                  title="ចម្លងទិន្នន័យ Backup ទាំងអស់ (Copy JSON)"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>Copy Backup</span>
-                </button>
-
-                <button
-                  onClick={handleDownloadBackup}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
-                  title="ទាញយកឯកសារ JSON Backup"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Backup</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Audit Logs Table */}
-            {filteredAuditLogs.length === 0 ? (
-              <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                <History className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                <p className="text-sm font-bold text-slate-600">មិនទាន់មានកំណត់ត្រា Audit Log នៅឡើយទេ</p>
-                <p className="text-xs text-slate-400 mt-1">
-                  រាល់ពេលលោកអ្នកចុច Save Store Totals ឬ Save Stock Log កំណត់ត្រានឹងបង្ហាញនៅទីនេះដោយស្វ័យប្រវត្តិ
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
-                      <th className="p-3">ពេលកត់ត្រា (Time)</th>
-                      <th className="p-3">កាលបរិច្ឆេទគោលដៅ</th>
-                      <th className="p-3">ប្រភេទ (Action)</th>
-                      <th className="p-3">ឧបករណ៍ (Device)</th>
-                      <th className="p-3">ព័ត៌មានលម្អិត (Details)</th>
-                      <th className="p-3 text-center">ស្ថានភាព</th>
-                      <th className="p-3 text-right">សកម្មភាព</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredAuditLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-50/80 transition-colors text-xs">
-                        <td className="p-3 font-mono text-slate-600 whitespace-nowrap">
-                          {log.timeFormatted || new Date(log.timestamp).toLocaleString()}
-                        </td>
-                        <td className="p-3 font-bold text-indigo-700 whitespace-nowrap">
-                          {log.targetDate}
-                        </td>
-                        <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
-                            log.actionType === 'STORE_TOTALS' 
-                              ? 'bg-indigo-100 text-indigo-800' 
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}>
-                            {log.actionType === 'STORE_TOTALS' ? 'សរុបសាខា' : 'ស្តុកទំនិញ'}
-                          </span>
-                        </td>
-                        <td className="p-3 text-slate-600 whitespace-nowrap font-medium">
-                          {log.device || 'System 🌐'}
-                        </td>
-                        <td className="p-3 text-slate-800 max-w-xs sm:max-w-md font-medium">
-                          <div>{log.titleKhmer}</div>
-                          {log.detailsKhmer && (
-                            <div className="text-[11px] text-slate-500 font-normal">{log.detailsKhmer}</div>
-                          )}
-                        </td>
-                        <td className="p-3 text-center whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                            <span>Saved &amp; Synced</span>
-                          </span>
-                        </td>
-                        <td className="p-3 text-right whitespace-nowrap">
-                          <button
-                            onClick={() => {
-                              if (log.targetDate && log.targetDate !== 'Unknown Date') {
-                                setSelectedDate(log.targetDate);
-                                setActiveTab(log.actionType === 'STOCK_LOG' ? 'stock' : 'stores');
-                                triggerNotification(`បានជ្រើសរើសទិន្នន័យថ្ងៃ ${log.targetDate}!`);
-                              }
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-lg border border-slate-200 font-bold transition-all active:scale-95"
-                            title="បើកមើលទិន្នន័យថ្ងៃនេះ"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>ពិនិត្យមើល</span>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* PERMANENT DATES ARCHIVE */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-indigo-600" />
-                  <span>បញ្ជីកាលបរិច្ឆេទដែលបានរក្សាទុកទាំងអស់ (Permanent Dates Archive)</span>
-                </h3>
-                <p className="text-xs text-slate-500">
-                  រាល់ទិន្នន័យកាលបរិច្ឆេទទាំងអស់ត្រូវបានរក្សាទុកអចិន្ត្រៃយ៍ អាចចុចជ្រើសរើសមើលឡើងវិញបានគ្រប់ពេល
-                </p>
-              </div>
-              <span className="text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-200">
-                {savedDatesList.length} ថ្ងៃសរុប
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-              {savedDatesList.map(dateStr => {
-                const isSelected = selectedDate === dateStr;
-                const hasStoreData = storesByDate[dateStr] && storesByDate[dateStr].some(s => s.dailyAmount > 0);
-                const hasStockData = stockByDate[dateStr] && stockByDate[dateStr].some(i => i.stock_in > 0 || i.stock_out > 0);
-
-                return (
-                  <button
-                    key={dateStr}
-                    onClick={() => {
-                      setSelectedDate(dateStr);
-                      triggerNotification(`បានជ្រើសរើសថ្ងៃ ${dateStr}!`);
-                    }}
-                    className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                      isSelected
-                        ? "bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-500/20 shadow-xs"
-                        : "bg-slate-50 hover:bg-slate-100/80 border-slate-200/80"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1 mb-1">
-                      <span className={`text-xs font-black font-mono ${isSelected ? 'text-indigo-900' : 'text-slate-800'}`}>
-                        {dateStr}
-                      </span>
-                      {isSelected && (
-                        <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1 text-[10px]">
-                      {hasStoreData && (
-                        <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold">
-                          Stores ✓
-                        </span>
-                      )}
-                      {hasStockData && (
-                        <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded font-bold">
-                          Stock ✓
-                        </span>
-                      )}
-                      {!hasStoreData && !hasStockData && (
-                        <span className="text-slate-400">Saved</span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* REFERENCE GUIDE MODAL (ឯកសារយោង & របៀបប្រើប្រាស់ផ្លូវការ) */}
-      {/* ========================================================================= */}
-      {isReferenceOpen && (
+      {isPinModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
-            {/* Modal Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-xs z-10">
-              <div className="flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                  <FileText className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base sm:text-lg font-black text-slate-900">
-                    📘 សៀវភៅណែនាំ &amp; REFERENCE ផ្លូវការ
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    គោលការណ៍រក្សាទុកទិន្នន័យអចិន្ត្រៃយ៍ &amp; ការប្រើប្រាស់ព្រមគ្នាលើ Phone &amp; PC
-                  </p>
-                </div>
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-slate-800 font-bold">
+                <ShieldCheck className="w-5 h-5 text-amber-600" />
+                <span>ផ្ទៀងផ្ទាត់លេខកូដ (Security PIN)</span>
               </div>
-
               <button
-                onClick={() => setIsReferenceOpen(false)}
-                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all"
+                onClick={() => setIsPinModalOpen(false)}
+                className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Modal Content */}
-            <div className="p-5 sm:p-6 space-y-4 text-xs sm:text-sm text-slate-700">
-              {/* Section 1 */}
-              <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200/80">
-                <h4 className="font-bold text-emerald-900 flex items-center gap-2 text-sm">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <span>១. ការរក្សាទុកទិន្នន័យអចិន្ត្រៃយ៍ (Permanent Data Retention)</span>
-                </h4>
-                <p className="text-xs text-emerald-800/90 mt-1 leading-relaxed">
-                  រាល់ពេលដែលលោកអ្នកចុចប៊ូតុង <strong>Save Store Totals</strong> ឬ <strong>Save Stock Log</strong> ទិន្នន័យនឹងត្រូវបញ្ជូនទៅរក្សាទុកជាស្ថាពរលើ Cloud Database និងកត់ត្រាទុកក្នុង Local Storage ម៉ាស៊ីន។ ប្រព័ន្ធប្រើបច្ចេកវិទ្យា <strong>Non-destructive Deep Merge</strong> ដែលធានាថាទិន្នន័យថ្ងៃចាស់ៗ និងសាខាផ្សេងៗ មិនត្រូវបានលុបបាត់ឡើយ។
-                </p>
+            <div className="my-5 space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">
+                  លេខកូដសម្ងាត់ (PIN 4 ខ្ទង់)៖
+                </label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  inputMode="numeric"
+                  autoFocus
+                  placeholder="••••"
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handlePinSubmit()}
+                  className="w-full text-center tracking-[0.4em] font-mono text-xl py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
               </div>
 
-              {/* Section 2 */}
-              <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-200/80">
-                <h4 className="font-bold text-indigo-900 flex items-center gap-2 text-sm">
-                  <Users className="w-4 h-4 text-indigo-600" />
-                  <span>២. ដំណើរការព្រមគ្នាលើ Phone &amp; PC (Concurrent Multi-Device Collaboration)</span>
-                </h4>
-                <p className="text-xs text-indigo-800/90 mt-1 leading-relaxed">
-                  ក្រុមការងារអាចបើកដំណើរការទូរសព្ទ័ដៃ (Mobile) និងកុំព្យូទ័រ (PC) ក្នុងពេលតែមួយ។ ប្រព័ន្ធមានមុខងារ <strong>Auto-Background Polling រៀងរាល់ 15 វិនាទី</strong> និង Re-sync ស្វ័យប្រវត្តិនៅពេលត្រឡប់ចូល Screen វិញ ធ្វើឱ្យលេខដែលបញ្ចូលលើទូរសព្ទ័ នឹងបង្ហាញលើកុំព្យូទ័រដោយស្វ័យប្រវត្តិ។
+              {pinError && (
+                <p className="text-xs text-rose-600 font-bold text-center">
+                  {pinError}
                 </p>
-              </div>
+              )}
 
-              {/* Section 3 */}
-              <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-200/80">
-                <h4 className="font-bold text-purple-900 flex items-center gap-2 text-sm">
-                  <History className="w-4 h-4 text-purple-600" />
-                  <span>៣. ការតាមដានប្រវត្តិទិន្នន័យ (Audit Trail &amp; Activity Tracking)</span>
-                </h4>
-                <p className="text-xs text-purple-800/90 mt-1 leading-relaxed">
-                  រាល់ការ Save នីមួយៗ ត្រូវបានបង្កើតជា Audit Log កត់ត្រាទុកនូវ៖ ម៉ោង, ថ្ងៃ, ចំនួន Items, សាខា និងឧបករណ៍ដែលបាន Update (Phone 📱 ឬ PC 💻)។ លោកអ្នកអាចចូលទៅកាន់ Tab <strong>«ប្រវត្តិ &amp; តាមដាន Live Sync»</strong> ដើម្បីពិនិត្យមើលឡើងវិញ ឬចុចប៊ូតុង «ពិនិត្យមើល» ដើម្បីបើកមើលទិន្នន័យថ្ងៃនោះបានភ្លាមៗ។
-                </p>
-              </div>
-
-              {/* Section 4 */}
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <h4 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
-                  <span>៤. សាខាទាំង ១៣ (13 Standard Stores)</span>
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 text-xs">
-                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
-                    <p className="font-bold text-amber-800">Tube Coffee+ (9 ហាង)៖</p>
-                    <p className="text-slate-600 mt-0.5">KPI, TKC, CCV, CDP, CMH, KSH, CKD, 2K4, RTN</p>
-                  </div>
-                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
-                    <p className="font-bold text-blue-800">OnMart (4 ហាង)៖</p>
-                    <p className="text-slate-600 mt-0.5">PDK, TK, OU3, DT</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 5 */}
-              <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200/80">
-                <h4 className="font-bold text-amber-900 flex items-center gap-2 text-sm">
-                  <span>៥. លេខកូដសម្ងាត់ &amp; ការ Backup (PIN &amp; Export)</span>
-                </h4>
-                <p className="text-xs text-amber-800/90 mt-1 leading-relaxed">
-                  • <strong>លេខកូដសម្ងាត់ផ្លូវការ៖</strong> <code className="bg-amber-100 px-1.5 py-0.5 rounded font-black text-amber-900">8899</code> (លេខចាស់ 1234 ត្រូវបាន Block ដាច់ខាត)<br />
-                  • <strong>ការទាញយកទិន្នន័យ Backup៖</strong> អាចចុចប៊ូតុង «Download Backup» ដើម្បីរក្សាទុកឯកសារ JSON លើម៉ាស៊ីនផ្ទាល់ខ្លួនបានគ្រប់ពេលវេលា។
-                </p>
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-600 space-y-1">
+                <p>• <strong>Manager (0203)៖</strong> បើកមើលតម្លៃ CPU ($) និងរបាយការណ៍ទាំងអស់</p>
+                <p>• <strong>Staff (8899)៖</strong> លាក់តម្លៃ រក្សាការបញ្ចូលទិន្នន័យធម្មតា</p>
               </div>
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <button
-                onClick={() => setIsReferenceOpen(false)}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
+                type="button"
+                onClick={() => setIsPinModalOpen(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100"
               >
-                យល់ព្រម (Close)
+                បោះបង់
+              </button>
+              <button
+                type="button"
+                onClick={handlePinSubmit}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+              >
+                យល់ព្រម (Confirm)
               </button>
             </div>
           </div>
