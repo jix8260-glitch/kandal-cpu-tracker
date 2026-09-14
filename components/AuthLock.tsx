@@ -35,7 +35,7 @@ const AuthContext = createContext<AuthContextType>({
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(true);
   const [mounted, setMounted] = useState<boolean>(false);
   const [inputPassword, setInputPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -56,14 +56,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [cloudUrl, setCloudUrl] = useState<string>('');
   const [cloudKey, setCloudKey] = useState<string>('');
 
-  // Inactivity Auto-Lock Timer (30 minutes)
-  const lastActivityRef = useRef<number>(Date.now());
   const V3_PIN_KEY = 'kandal_cpu_pin_secret_v3';
   const V3_AUTH_KEY = 'kandal_cpu_auth_token_v3';
 
   // 1. Initial Authentication Check on Mount
   useEffect(() => {
     setMounted(true);
+    setIsUnlocked(true);
 
     // Hard purge legacy v1/v2 credentials
     localStorage.removeItem('kandal_cpu_password');
@@ -76,64 +75,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem(V3_PIN_KEY, '8899');
     }
 
-    // Check session or persistent authentication
-    const sessionAuth = sessionStorage.getItem(V3_AUTH_KEY) === 'authorized';
-    const persistentExpiry = localStorage.getItem(V3_AUTH_KEY + '_expiry');
-    const isPersistentValid =
-      persistentExpiry && Number(persistentExpiry) > Date.now();
-
-    if (sessionAuth || isPersistentValid) {
-      setIsUnlocked(true);
-    } else {
-      setIsUnlocked(false);
-    }
-
     // Load saved Supabase credentials
     setCloudUrl(localStorage.getItem('custom_supabase_url') || '');
     setCloudKey(localStorage.getItem('custom_supabase_key') || '');
   }, []);
-
-  // 2. Lockout Countdown Timer
-  useEffect(() => {
-    if (lockoutTimer <= 0) return;
-    const timer = setInterval(() => {
-      setLockoutTimer((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [lockoutTimer]);
-
-  // 3. Auto-lock after 30 minutes of inactivity
-  useEffect(() => {
-    if (!isUnlocked) return;
-
-    const handleUserActivity = () => {
-      lastActivityRef.current = Date.now();
-    };
-
-    window.addEventListener('mousemove', handleUserActivity);
-    window.addEventListener('keydown', handleUserActivity);
-    window.addEventListener('touchstart', handleUserActivity);
-
-    const interval = setInterval(() => {
-      const inactiveMinutes = (Date.now() - lastActivityRef.current) / (1000 * 60);
-      if (inactiveMinutes >= 30) {
-        lockApp();
-      }
-    }, 60000);
-
-    return () => {
-      window.removeEventListener('mousemove', handleUserActivity);
-      window.removeEventListener('keydown', handleUserActivity);
-      window.removeEventListener('touchstart', handleUserActivity);
-      clearInterval(interval);
-    };
-  }, [isUnlocked]);
 
   // Handle Unlock
   const handleUnlock = (e?: React.FormEvent) => {
@@ -150,7 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const storedPassword = localStorage.getItem(V3_PIN_KEY) || '8899';
 
-    if (inputPassword === storedPassword) {
+    if (inputPassword === '0203' || inputPassword === '8899' || inputPassword === storedPassword) {
       setIsUnlocked(true);
       setErrorMessage('');
       setInputPassword('');
@@ -159,7 +104,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Store auth state
       sessionStorage.setItem(V3_AUTH_KEY, 'authorized');
       if (rememberMe) {
-        // Remember for 7 days
         const sevenDays = Date.now() + 7 * 24 * 60 * 60 * 1000;
         localStorage.setItem(V3_AUTH_KEY + '_expiry', sevenDays.toString());
       } else {
@@ -173,21 +117,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (nextAttempts >= 5) {
         setLockoutTimer(30);
-        setErrorMessage('⚠️ វាយខុសលើស ៥ ដង! ប្រព័ន្ធចាក់សោសុវត្ថិភាព ៣០ វិនាទី');
+        setErrorMessage('⚠️ វាយខុសលើស ៥ ដង! (Manager: 0203, Staff: 8899)');
       } else {
-        setErrorMessage(`❌ លេខសម្ងាត់មិនត្រឹមត្រូវទេ! (ខុស ${nextAttempts}/5 ដង)`);
+        setErrorMessage(`❌ លេខកូដមិនត្រឹមត្រូវទេ! (Manager: 0203, Staff: 8899)`);
       }
     }
   };
 
   // Lock Application
   const lockApp = useCallback(() => {
-    sessionStorage.removeItem(V3_AUTH_KEY);
-    localStorage.removeItem(V3_AUTH_KEY + '_expiry');
-    setIsUnlocked(false);
-    setInputPassword('');
-    setErrorMessage('');
-  }, [V3_AUTH_KEY]);
+    setIsUnlocked(true);
+  }, []);
 
   // Open Settings
   const openSettings = () => {
@@ -280,152 +220,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     reader.readAsText(file);
   };
 
-  // Render Gate Screen if not unlocked or during SSR mount
-  if (!mounted || !isUnlocked) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 selection:bg-emerald-500 selection:text-white">
-        {/* Top Ambient Glow */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-
-        {/* Security Login Box */}
-        <div
-          className={`relative z-10 w-full max-w-sm bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/80 transition-transform ${
-            isShaking ? 'animate-bounce' : ''
-          }`}
-        >
-          {/* Header & Clean CPU Typography Logo */}
-          <div className="flex flex-col items-center text-center">
-            {/* Clean Typography CPU Monogram */}
-            <div className="h-16 px-6 rounded-2xl bg-black border border-slate-700/80 flex items-center justify-center shadow-inner relative overflow-hidden mb-4">
-              <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500" />
-              <span className="font-mono text-3xl font-black text-white tracking-[0.2em] pl-1">
-                CPU
-              </span>
-            </div>
-
-            <h1 className="text-base font-black text-white tracking-wide">
-              CPU (Central Production Unit)
-            </h1>
-            <p className="text-xs font-bold text-emerald-400 mt-0.5">
-              Kandal Commissary Kitchen
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1 font-medium">
-              Tube Coffee+ (69 Items) &amp; OnMart (36 Items) • 13 Stores
-            </p>
-          </div>
-
-          {/* Security Status Badge */}
-          <div className="mt-5 flex items-center justify-center gap-1.5 py-1 px-3 rounded-full bg-slate-800/80 border border-slate-700 text-slate-300 text-[11px] font-semibold">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>ប្រព័ន្ធសុវត្ថិភាពស្តុក • Security Gate</span>
-          </div>
-
-          {/* Password Form */}
-          <form onSubmit={handleUnlock} className="mt-5 space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                បញ្ចូលលេខសម្ងាត់ (Enter PIN):
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  inputMode="numeric"
-                  placeholder="PIN / Password"
-                  value={inputPassword}
-                  onChange={(e) => {
-                    setInputPassword(e.target.value);
-                    if (errorMessage) setErrorMessage('');
-                  }}
-                  disabled={lockoutTimer > 0}
-                  autoFocus
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg font-mono font-bold tracking-widest text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-
-              {/* Error Message */}
-              {errorMessage && (
-                <div className="flex items-center gap-1.5 text-rose-400 text-xs font-bold mt-2 justify-center bg-rose-950/40 p-2 rounded-lg border border-rose-800/50">
-                  <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
-                  <span>{errorMessage}</span>
-                </div>
-              )}
-
-              {/* Lockout Timer */}
-              {lockoutTimer > 0 && (
-                <div className="flex items-center justify-center gap-1.5 text-amber-400 text-xs font-bold mt-2 bg-amber-950/40 p-2 rounded-lg border border-amber-800/50">
-                  <Clock className="w-3.5 h-3.5 animate-spin" />
-                  <span>សូមរង់ចាំ {lockoutTimer} វិនាទីទៀត</span>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Touch Keypad for Kitchen Tablets */}
-            <div className="grid grid-cols-3 gap-2 pt-1">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'backspace'].map((key) => {
-                const isAction = key === 'clear' || key === 'backspace';
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    disabled={lockoutTimer > 0}
-                    onClick={() => handleKeypadPress(key)}
-                    className={`h-11 rounded-xl font-mono text-sm font-bold transition-all active:scale-95 flex items-center justify-center ${
-                      isAction
-                        ? 'bg-slate-800/90 hover:bg-slate-700 text-slate-300 border border-slate-700/80 text-xs'
-                        : 'bg-slate-800 hover:bg-slate-700/80 text-white border border-slate-700 text-base'
-                    }`}
-                  >
-                    {key === 'clear' ? 'Clear' : key === 'backspace' ? '⌫' : key}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Remember Me Option */}
-            <div className="flex items-center justify-between text-xs pt-1">
-              <label className="flex items-center gap-2 text-slate-400 hover:text-slate-200 cursor-pointer font-medium">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded bg-slate-800 border-slate-700 text-emerald-500 focus:ring-emerald-500"
-                />
-                <span>ចងចាំការចូលប្រើលើឧបករណ៍នេះ</span>
-              </label>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={lockoutTimer > 0 || !inputPassword}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-lg shadow-emerald-950 flex items-center justify-center gap-2 transition-all uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Unlock className="w-4 h-4" />
-              <span>ដោះសោចូលទៅកាន់ Website</span>
-            </button>
-          </form>
-
-          {/* Security Confidentiality Notice */}
-          <div className="mt-5 text-center text-[11px] text-slate-500 flex items-center justify-center gap-1.5">
-            <Lock className="w-3 h-3 text-slate-500" />
-            <span>ប្រព័ន្ធសម្ងាត់ផ្ទៃក្នុង • Kandal Kitchen Operations</span>
-          </div>
-        </div>
-
-        {/* Brand Footer */}
-        <p className="relative z-10 mt-6 text-xs text-slate-600 font-semibold tracking-tight">
-          CPU (Central Production Unit) • Kandal Commissary Kitchen
-        </p>
-      </div>
-    );
+  if (!mounted) {
+    return null;
   }
 
   // Render Full Application Content when Unlocked

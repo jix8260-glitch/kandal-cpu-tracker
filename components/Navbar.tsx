@@ -14,8 +14,7 @@ export const Navbar: React.FC = () => {
 
   const navLinks = [
     { href: '/', label: 'Daily Stock Tracker', icon: <Calendar className="w-4 h-4" /> },
-    { href: '/items', label: 'Item Master & CPU', icon: <Package className="w-4 h-4" /> },
-    { href: '/summary', label: 'Stores & Summary (១៣ ហាង)', icon: <BarChart3 className="w-4 h-4" /> },
+    { href: '/summary', label: 'Store Summary (១៣ ហាង)', icon: <BarChart3 className="w-4 h-4" /> },
   ];
 
   return (
@@ -47,7 +46,7 @@ export const Navbar: React.FC = () => {
           })}
         </nav>
 
-        {/* Right Tools: Lock, Settings, Cloud Indicator */}
+        {/* Right Tools: Cloud Indicator */}
         <div className="flex items-center gap-2">
           {/* Cloud Status */}
           <div
@@ -60,26 +59,6 @@ export const Navbar: React.FC = () => {
             <Cloud className="w-3.5 h-3.5 text-emerald-600" />
             <span>{isSupabaseConfigured ? 'Supabase Online' : 'Auto-Save Active'}</span>
           </div>
-
-          {/* Settings Button */}
-          <button
-            onClick={openSettings}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-300 transition-colors"
-            title="ការកំណត់ប្រព័ន្ធ (Settings & Password)"
-          >
-            <Settings className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Settings</span>
-          </button>
-
-          {/* Lock App Button */}
-          <button
-            onClick={lockApp}
-            className="flex items-center gap-1 px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold border border-rose-200 transition-colors"
-            title="ចាក់សោប្រព័ន្ធ (Lock App)"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">ចាក់សោ</span>
-          </button>
         </div>
       </div>
     </header>

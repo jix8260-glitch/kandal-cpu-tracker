@@ -686,16 +686,6 @@ export default function StandardInventoryDashboard() {
             </button>
           </div>
 
-          {/* SINGLE STORE SUMMARY LINK */}
-          <Link
-            href="/summary"
-            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition-all shadow-xs"
-            title="ទៅកាន់ Store Summary"
-          >
-            <BarChart3 className="w-4 h-4 text-indigo-600" />
-            <span>Store Summary ↗</span>
-          </Link>
-
           {/* MANAGER PIN ACCESS BUTTON */}
           {isManager ? (
             <button
