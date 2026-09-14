@@ -23,9 +23,21 @@ import {
   ChevronRight,
   RefreshCw,
   Cloud,
-  CloudOff
+  CloudOff,
+  History,
+  FileText,
+  Download,
+  Copy,
+  ExternalLink,
+  ShieldCheck,
+  Users,
+  Smartphone,
+  Laptop,
+  X,
+  Eye
 } from "lucide-react";
 import { STARTER_ITEMS } from "@/lib/starter-items";
+import { AuditLogEntry } from "@/lib/types";
 
 // =========================================================================
 // 1. DATA TYPES & MODELS
@@ -127,7 +139,7 @@ const STORAGE_STOCK_BY_DATE_KEY = "kandal_cpu_stock_by_date_v5";
 const STORAGE_ITEM_PRICES_KEY = "kandal_cpu_item_prices_v5";
 
 export default function StandardInventoryDashboard() {
-  const [activeTab, setActiveTab] = useState<"stores" | "stock">("stock");
+  const [activeTab, setActiveTab] = useState<"stores" | "stock" | "history">("stock");
   const [selectedBrand, setSelectedBrand] = useState<"ALL" | "Tube Coffee" | "OnMart">("ALL");
   const [storePeriod, setStorePeriod] = useState<"daily" | "monthly" | "yearly">("monthly");
   
@@ -140,6 +152,11 @@ export default function StandardInventoryDashboard() {
   const [stockByDate, setStockByDate] = useState<{ [date: string]: StockItemRecord[] }>({});
   // Shared Price/CPU map
   const [itemPrices, setItemPrices] = useState<{ [code: string]: number }>({});
+
+  // Audit Logs & Tracking History
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [historySearchTerm, setHistorySearchTerm] = useState("");
+  const [isReferenceOpen, setIsReferenceOpen] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [notification, setNotification] = useState<string | null>(null);
@@ -179,6 +196,9 @@ export default function StandardInventoryDashboard() {
             return merged;
           });
         }
+        if (Array.isArray(cloudData.auditLogs)) {
+          setAuditLogs(cloudData.auditLogs);
+        }
         setSyncStatus("synced");
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastSyncedTime(timeStr);
@@ -195,11 +215,12 @@ export default function StandardInventoryDashboard() {
     }
   };
 
-  // Function to push data to cloud API
+  // Function to push data to cloud API with action metadata
   const saveToCloud = async (
     targetStoresByDate: typeof storesByDate,
     targetStockByDate: typeof stockByDate,
-    targetItemPrices: typeof itemPrices
+    targetItemPrices: typeof itemPrices,
+    actionMeta?: { actionType: 'STORE_TOTALS' | 'STOCK_LOG'; targetDate: string }
   ) => {
     setIsSaving(true);
     setSyncStatus("syncing");
@@ -218,10 +239,21 @@ export default function StandardInventoryDashboard() {
           storesByDate: targetStoresByDate,
           stockByDate: targetStockByDate,
           itemPrices: targetItemPrices,
+          actionMeta,
         }),
       });
 
       if (res.ok) {
+        const json = await res.json();
+        if (json.data?.auditLogs) {
+          setAuditLogs(json.data.auditLogs);
+        }
+        if (json.data?.storesByDate) {
+          setStoresByDate(json.data.storesByDate);
+        }
+        if (json.data?.stockByDate) {
+          setStockByDate(json.data.stockByDate);
+        }
         setSyncStatus("synced");
         const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         setLastSyncedTime(timeStr);
@@ -265,7 +297,18 @@ export default function StandardInventoryDashboard() {
       }
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+
+    // Auto background poll every 15 seconds for real-time concurrent multi-device sync
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchFromCloud(false);
+      }
+    }, 15000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      clearInterval(pollInterval);
+    };
   }, []);
 
   // Current stores for the selected date (default to 0 if none)
@@ -342,9 +385,12 @@ export default function StandardInventoryDashboard() {
 
   const handleSaveStockLog = async () => {
     triggerNotification(`កំពុងរក្សាទុកស្តុក (${selectedDate}) ទៅ Cloud & Phone...`);
-    const success = await saveToCloud(storesByDate, stockByDate, itemPrices);
+    const success = await saveToCloud(storesByDate, stockByDate, itemPrices, {
+      actionType: 'STOCK_LOG',
+      targetDate: selectedDate,
+    });
     if (success) {
-      triggerNotification(`✅ បានរក្សាទុកស្តុក (${selectedDate}) ទៅ Cloud រួចរាល់! អាចមើលឃើញលើទូរសព្ទ័ភ្លាមៗ`);
+      triggerNotification(`✅ បានរក្សាទុកស្តុក (${selectedDate}) ទៅ Cloud & History រួចរាល់! អាចមើលឃើញលើទូរសព្ទ័ភ្លាមៗ`);
     } else {
       triggerNotification(`✅ បានរក្សាទុកក្នុងទូរសព្ទ័/កុំព្យូទ័រ (Local)`);
     }
@@ -397,9 +443,12 @@ export default function StandardInventoryDashboard() {
 
   const handleSaveStoreTotals = async () => {
     triggerNotification(`កំពុងរក្សាទុកបរិមាណសរុបសាខា (${selectedDate}) ទៅ Cloud & Phone...`);
-    const success = await saveToCloud(storesByDate, stockByDate, itemPrices);
+    const success = await saveToCloud(storesByDate, stockByDate, itemPrices, {
+      actionType: 'STORE_TOTALS',
+      targetDate: selectedDate,
+    });
     if (success) {
-      triggerNotification(`✅ បានរក្សាទុកបរិមាណសរុបសាខា (${selectedDate}) ទៅ Cloud រួចរាល់! អាចមើលឃើញលើទូរសព្ទ័ភ្លាមៗ`);
+      triggerNotification(`✅ បានរក្សាទុកបរិមាណសរុបសាខា (${selectedDate}) ទៅ Cloud & History រួចរាល់! អាចមើលឃើញលើទូរសព្ទ័ភ្លាមៗ`);
     } else {
       triggerNotification(`✅ បានរក្សាទុកក្នុងទូរសព្ទ័/កុំព្យូទ័រ (Local)`);
     }
@@ -445,6 +494,67 @@ export default function StandardInventoryDashboard() {
     });
   }, [currentStores, selectedBrand, searchTerm]);
 
+  // Filtered Audit Logs for History Tab
+  const filteredAuditLogs = useMemo(() => {
+    if (!historySearchTerm.trim()) return auditLogs;
+    const q = historySearchTerm.toLowerCase();
+    return auditLogs.filter(log => 
+      log.targetDate?.toLowerCase().includes(q) ||
+      log.titleKhmer?.toLowerCase().includes(q) ||
+      log.detailsKhmer?.toLowerCase().includes(q) ||
+      log.device?.toLowerCase().includes(q) ||
+      log.actionType?.toLowerCase().includes(q)
+    );
+  }, [auditLogs, historySearchTerm]);
+
+  // List of all dates recorded in the cloud/local storage
+  const savedDatesList = useMemo(() => {
+    const datesSet = new Set<string>();
+    Object.keys(storesByDate).forEach(d => datesSet.add(d));
+    Object.keys(stockByDate).forEach(d => datesSet.add(d));
+    auditLogs.forEach(l => { if (l.targetDate && l.targetDate !== 'Unknown Date') datesSet.add(l.targetDate); });
+    return Array.from(datesSet).sort().reverse();
+  }, [storesByDate, stockByDate, auditLogs]);
+
+  // Copy full backup JSON to clipboard
+  const handleCopyBackup = () => {
+    try {
+      const backup = {
+        storesByDate,
+        stockByDate,
+        itemPrices,
+        auditLogs,
+        exportedAt: new Date().toISOString()
+      };
+      navigator.clipboard.writeText(JSON.stringify(backup, null, 2));
+      triggerNotification("✅ បានចម្លងទិន្នន័យ Backup ទាំងអស់ទៅក្នុង Clipboard រួចរាល់!");
+    } catch (e) {
+      triggerNotification("⚠️ មិនអាចចម្លងទិន្នន័យបានទេ");
+    }
+  };
+
+  // Download full backup JSON
+  const handleDownloadBackup = () => {
+    try {
+      const backup = {
+        storesByDate,
+        stockByDate,
+        itemPrices,
+        auditLogs,
+        exportedAt: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `kandal_stock_backup_${selectedDate}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      triggerNotification("✅ បានទាញយកឯកសារ JSON Backup រួចរាល់!");
+    } catch (e) {
+      triggerNotification("⚠️ មិនអាចទាញយកឯកសារបានទេ");
+    }
+  };
 
   return (
     <div className="w-full space-y-6">
@@ -509,10 +619,10 @@ export default function StandardInventoryDashboard() {
             </button>
           </div>
 
-          <div className="flex items-center bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+          <div className="flex items-center bg-slate-100 p-1.5 rounded-xl border border-slate-200 gap-1">
             <button
               onClick={() => { setActiveTab("stock"); setSearchTerm(""); }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                 activeTab === "stock"
                   ? "bg-white text-emerald-700 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
@@ -523,7 +633,7 @@ export default function StandardInventoryDashboard() {
             </button>
             <button
               onClick={() => { setActiveTab("stores"); setSearchTerm(""); }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
                 activeTab === "stores"
                   ? "bg-white text-indigo-700 shadow-sm"
                   : "text-slate-600 hover:text-slate-900"
@@ -532,7 +642,32 @@ export default function StandardInventoryDashboard() {
               <Store className="w-4 h-4" />
               <span>សរុបតាមសាខា (Store Totals)</span>
             </button>
+            <button
+              onClick={() => { setActiveTab("history"); setSearchTerm(""); }}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                activeTab === "history"
+                  ? "bg-white text-purple-700 shadow-sm"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <History className="w-4 h-4 text-purple-600" />
+              <span>ប្រវត្តិ &amp; តាមដាន Live Sync</span>
+              {auditLogs.length > 0 && (
+                <span className="px-1.5 py-0.5 text-[10px] font-extrabold rounded-full bg-purple-100 text-purple-800">
+                  {auditLogs.length}
+                </span>
+              )}
+            </button>
           </div>
+
+          <button
+            onClick={() => setIsReferenceOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all shadow-xs"
+            title="បើកមើលសៀវភៅណែនាំ & REFERENCE ផ្លូវការ"
+          >
+            <FileText className="w-4 h-4 text-emerald-600" />
+            <span>REFERENCE ឯកសារយោង</span>
+          </button>
 
           <Link
             href="/summary"
@@ -1190,6 +1325,362 @@ export default function StandardInventoryDashboard() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 3: UPDATE HISTORY & CONCURRENT AUDIT TRAIL */}
+      {/* ========================================================================= */}
+      {activeTab === "history" && (
+        <div className="space-y-6 animate-fadeIn">
+
+          {/* KPI STAT CARDS FOR AUDIT TRAIL & CONCURRENCY */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500 font-medium">ស្ថានភាពដំណើរការព្រមគ្នា (Live Sync)</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-base font-bold text-emerald-700">កំពុង Sync ស្វ័យប្រវត្តិ</span>
+                </div>
+                <span className="text-xs text-slate-400">Phone 📱 &amp; PC 💻 Auto-Sync (15s)</span>
+              </div>
+              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                <Users className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500 font-medium">កាលបរិច្ឆេទដែលបានកត់ត្រា (Saved Days)</p>
+                <p className="text-2xl font-bold text-indigo-600 mt-1">{savedDatesList.length} ថ្ងៃ</p>
+                <span className="text-xs text-slate-400">រក្សាទុកអចិន្ត្រៃយ៍លើ Cloud</span>
+              </div>
+              <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center">
+                <Calendar className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500 font-medium">កំណត់ត្រា Audit Logs សរុប</p>
+                <p className="text-2xl font-bold text-purple-600 mt-1">{auditLogs.length} Records</p>
+                <span className="text-xs text-slate-400">តាមដានរាល់ការចុច Save</span>
+              </div>
+              <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center">
+                <History className="w-6 h-6" />
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-xs text-slate-500 font-medium">ម៉ោង Sync ចុងក្រោយ (Last Sync)</p>
+                <p className="text-lg font-bold text-slate-800 mt-1">{lastSyncedTime || "Ready"}</p>
+                <span className="text-xs text-emerald-600 font-semibold">Cloud Synced ✓</span>
+              </div>
+              <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center">
+                <Clock className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
+
+          {/* AUDIT LOG TABLE & ARCHIVE */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <History className="w-5 h-5 text-purple-600" />
+                  <span>តារាងតាមដានប្រវត្តិនៃការកែប្រែទិន្នន័យ (Audit Trail &amp; Update History)</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  តាមដានរាល់ការកែប្រែ ឬការដាក់ទិន្នន័យចូលដែលបានដំណើរការព្រមគ្នាលើ Phone &amp; PC (រក្សាទុកជាអចិន្ត្រៃយ៍)
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+                <div className="relative flex-1 sm:w-64">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="ស្វែងរកតាមកាលបរិច្ឆេទ / ឧបករណ៍..."
+                    value={historySearchTerm}
+                    onChange={(e) => setHistorySearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 text-xs rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+
+                <button
+                  onClick={handleCopyBackup}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200 active:scale-95"
+                  title="ចម្លងទិន្នន័យ Backup ទាំងអស់ (Copy JSON)"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>Copy Backup</span>
+                </button>
+
+                <button
+                  onClick={handleDownloadBackup}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                  title="ទាញយកឯកសារ JSON Backup"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Backup</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Audit Logs Table */}
+            {filteredAuditLogs.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <History className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-bold text-slate-600">មិនទាន់មានកំណត់ត្រា Audit Log នៅឡើយទេ</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  រាល់ពេលលោកអ្នកចុច Save Store Totals ឬ Save Stock Log កំណត់ត្រានឹងបង្ហាញនៅទីនេះដោយស្វ័យប្រវត្តិ
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
+                      <th className="p-3">ពេលកត់ត្រា (Time)</th>
+                      <th className="p-3">កាលបរិច្ឆេទគោលដៅ</th>
+                      <th className="p-3">ប្រភេទ (Action)</th>
+                      <th className="p-3">ឧបករណ៍ (Device)</th>
+                      <th className="p-3">ព័ត៌មានលម្អិត (Details)</th>
+                      <th className="p-3 text-center">ស្ថានភាព</th>
+                      <th className="p-3 text-right">សកម្មភាព</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredAuditLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-slate-50/80 transition-colors text-xs">
+                        <td className="p-3 font-mono text-slate-600 whitespace-nowrap">
+                          {log.timeFormatted || new Date(log.timestamp).toLocaleString()}
+                        </td>
+                        <td className="p-3 font-bold text-indigo-700 whitespace-nowrap">
+                          {log.targetDate}
+                        </td>
+                        <td className="p-3">
+                          <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                            log.actionType === 'STORE_TOTALS' 
+                              ? 'bg-indigo-100 text-indigo-800' 
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}>
+                            {log.actionType === 'STORE_TOTALS' ? 'សរុបសាខា' : 'ស្តុកទំនិញ'}
+                          </span>
+                        </td>
+                        <td className="p-3 text-slate-600 whitespace-nowrap font-medium">
+                          {log.device || 'System 🌐'}
+                        </td>
+                        <td className="p-3 text-slate-800 max-w-xs sm:max-w-md font-medium">
+                          <div>{log.titleKhmer}</div>
+                          {log.detailsKhmer && (
+                            <div className="text-[11px] text-slate-500 font-normal">{log.detailsKhmer}</div>
+                          )}
+                        </td>
+                        <td className="p-3 text-center whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            <span>Saved &amp; Synced</span>
+                          </span>
+                        </td>
+                        <td className="p-3 text-right whitespace-nowrap">
+                          <button
+                            onClick={() => {
+                              if (log.targetDate && log.targetDate !== 'Unknown Date') {
+                                setSelectedDate(log.targetDate);
+                                setActiveTab(log.actionType === 'STOCK_LOG' ? 'stock' : 'stores');
+                                triggerNotification(`បានជ្រើសរើសទិន្នន័យថ្ងៃ ${log.targetDate}!`);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 rounded-lg border border-slate-200 font-bold transition-all active:scale-95"
+                            title="បើកមើលទិន្នន័យថ្ងៃនេះ"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>ពិនិត្យមើល</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* PERMANENT DATES ARCHIVE */}
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-indigo-600" />
+                  <span>បញ្ជីកាលបរិច្ឆេទដែលបានរក្សាទុកទាំងអស់ (Permanent Dates Archive)</span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  រាល់ទិន្នន័យកាលបរិច្ឆេទទាំងអស់ត្រូវបានរក្សាទុកអចិន្ត្រៃយ៍ អាចចុចជ្រើសរើសមើលឡើងវិញបានគ្រប់ពេល
+                </p>
+              </div>
+              <span className="text-xs font-bold bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-200">
+                {savedDatesList.length} ថ្ងៃសរុប
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+              {savedDatesList.map(dateStr => {
+                const isSelected = selectedDate === dateStr;
+                const hasStoreData = storesByDate[dateStr] && storesByDate[dateStr].some(s => s.dailyAmount > 0);
+                const hasStockData = stockByDate[dateStr] && stockByDate[dateStr].some(i => i.stock_in > 0 || i.stock_out > 0);
+
+                return (
+                  <button
+                    key={dateStr}
+                    onClick={() => {
+                      setSelectedDate(dateStr);
+                      triggerNotification(`បានជ្រើសរើសថ្ងៃ ${dateStr}!`);
+                    }}
+                    className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                      isSelected
+                        ? "bg-indigo-50/80 border-indigo-300 ring-2 ring-indigo-500/20 shadow-xs"
+                        : "bg-slate-50 hover:bg-slate-100/80 border-slate-200/80"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className={`text-xs font-black font-mono ${isSelected ? 'text-indigo-900' : 'text-slate-800'}`}>
+                        {dateStr}
+                      </span>
+                      {isSelected && (
+                        <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-1 text-[10px]">
+                      {hasStoreData && (
+                        <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold">
+                          Stores ✓
+                        </span>
+                      )}
+                      {hasStockData && (
+                        <span className="px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded font-bold">
+                          Stock ✓
+                        </span>
+                      )}
+                      {!hasStoreData && !hasStockData && (
+                        <span className="text-slate-400">Saved</span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* REFERENCE GUIDE MODAL (ឯកសារយោង & របៀបប្រើប្រាស់ផ្លូវការ) */}
+      {/* ========================================================================= */}
+      {isReferenceOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-xs z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                    📘 សៀវភៅណែនាំ &amp; REFERENCE ផ្លូវការ
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    គោលការណ៍រក្សាទុកទិន្នន័យអចិន្ត្រៃយ៍ &amp; ការប្រើប្រាស់ព្រមគ្នាលើ Phone &amp; PC
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsReferenceOpen(false)}
+                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 sm:p-6 space-y-4 text-xs sm:text-sm text-slate-700">
+              {/* Section 1 */}
+              <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200/80">
+                <h4 className="font-bold text-emerald-900 flex items-center gap-2 text-sm">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>១. ការរក្សាទុកទិន្នន័យអចិន្ត្រៃយ៍ (Permanent Data Retention)</span>
+                </h4>
+                <p className="text-xs text-emerald-800/90 mt-1 leading-relaxed">
+                  រាល់ពេលដែលលោកអ្នកចុចប៊ូតុង <strong>Save Store Totals</strong> ឬ <strong>Save Stock Log</strong> ទិន្នន័យនឹងត្រូវបញ្ជូនទៅរក្សាទុកជាស្ថាពរលើ Cloud Database និងកត់ត្រាទុកក្នុង Local Storage ម៉ាស៊ីន។ ប្រព័ន្ធប្រើបច្ចេកវិទ្យា <strong>Non-destructive Deep Merge</strong> ដែលធានាថាទិន្នន័យថ្ងៃចាស់ៗ និងសាខាផ្សេងៗ មិនត្រូវបានលុបបាត់ឡើយ។
+                </p>
+              </div>
+
+              {/* Section 2 */}
+              <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-200/80">
+                <h4 className="font-bold text-indigo-900 flex items-center gap-2 text-sm">
+                  <Users className="w-4 h-4 text-indigo-600" />
+                  <span>២. ដំណើរការព្រមគ្នាលើ Phone &amp; PC (Concurrent Multi-Device Collaboration)</span>
+                </h4>
+                <p className="text-xs text-indigo-800/90 mt-1 leading-relaxed">
+                  ក្រុមការងារអាចបើកដំណើរការទូរសព្ទ័ដៃ (Mobile) និងកុំព្យូទ័រ (PC) ក្នុងពេលតែមួយ។ ប្រព័ន្ធមានមុខងារ <strong>Auto-Background Polling រៀងរាល់ 15 វិនាទី</strong> និង Re-sync ស្វ័យប្រវត្តិនៅពេលត្រឡប់ចូល Screen វិញ ធ្វើឱ្យលេខដែលបញ្ចូលលើទូរសព្ទ័ នឹងបង្ហាញលើកុំព្យូទ័រដោយស្វ័យប្រវត្តិ។
+                </p>
+              </div>
+
+              {/* Section 3 */}
+              <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-200/80">
+                <h4 className="font-bold text-purple-900 flex items-center gap-2 text-sm">
+                  <History className="w-4 h-4 text-purple-600" />
+                  <span>៣. ការតាមដានប្រវត្តិទិន្នន័យ (Audit Trail &amp; Activity Tracking)</span>
+                </h4>
+                <p className="text-xs text-purple-800/90 mt-1 leading-relaxed">
+                  រាល់ការ Save នីមួយៗ ត្រូវបានបង្កើតជា Audit Log កត់ត្រាទុកនូវ៖ ម៉ោង, ថ្ងៃ, ចំនួន Items, សាខា និងឧបករណ៍ដែលបាន Update (Phone 📱 ឬ PC 💻)។ លោកអ្នកអាចចូលទៅកាន់ Tab <strong>«ប្រវត្តិ &amp; តាមដាន Live Sync»</strong> ដើម្បីពិនិត្យមើលឡើងវិញ ឬចុចប៊ូតុង «ពិនិត្យមើល» ដើម្បីបើកមើលទិន្នន័យថ្ងៃនោះបានភ្លាមៗ។
+                </p>
+              </div>
+
+              {/* Section 4 */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <h4 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                  <span>៤. សាខាទាំង ១៣ (13 Standard Stores)</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 text-xs">
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                    <p className="font-bold text-amber-800">Tube Coffee+ (9 ហាង)៖</p>
+                    <p className="text-slate-600 mt-0.5">KPI, TKC, CCV, CDP, CMH, KSH, CKD, 2K4, RTN</p>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                    <p className="font-bold text-blue-800">OnMart (4 ហាង)៖</p>
+                    <p className="text-slate-600 mt-0.5">PDK, TK, OU3, DT</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 5 */}
+              <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200/80">
+                <h4 className="font-bold text-amber-900 flex items-center gap-2 text-sm">
+                  <span>៥. លេខកូដសម្ងាត់ &amp; ការ Backup (PIN &amp; Export)</span>
+                </h4>
+                <p className="text-xs text-amber-800/90 mt-1 leading-relaxed">
+                  • <strong>លេខកូដសម្ងាត់ផ្លូវការ៖</strong> <code className="bg-amber-100 px-1.5 py-0.5 rounded font-black text-amber-900">8899</code> (លេខចាស់ 1234 ត្រូវបាន Block ដាច់ខាត)<br />
+                  • <strong>ការទាញយកទិន្នន័យ Backup៖</strong> អាចចុចប៊ូតុង «Download Backup» ដើម្បីរក្សាទុកឯកសារ JSON លើម៉ាស៊ីនផ្ទាល់ខ្លួនបានគ្រប់ពេលវេលា។
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setIsReferenceOpen(false)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
+              >
+                យល់ព្រម (Close)
+              </button>
             </div>
           </div>
         </div>

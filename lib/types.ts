@@ -59,3 +59,20 @@ export interface CalculatedStockRow extends StockItem {
   isNegative: boolean;
   isLow: boolean;
 }
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;          // ISO string
+  timeFormatted: string;      // e.g. "14/09/2026, 10:30 PM"
+  targetDate: string;         // YYYY-MM-DD
+  actionType: 'STORE_TOTALS' | 'STOCK_LOG' | 'ITEM_PRICES' | 'MANUAL_SYNC';
+  titleKhmer: string;         // Summary title in Khmer
+  detailsKhmer: string;       // Detailed description in Khmer
+  device: string;             // "Mobile Phone 📱" or "Computer / PC 💻"
+  stats?: {
+    totalItems?: number;
+    storesCount?: number;
+    itemsCount?: number;
+  };
+}
+

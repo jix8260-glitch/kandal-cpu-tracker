@@ -25,7 +25,12 @@ import {
   Award,
   RefreshCw,
   Cloud,
-  CloudOff
+  CloudOff,
+  FileText,
+  X,
+  ShieldCheck,
+  Users,
+  History
 } from 'lucide-react';
 import {
   StockItem,
@@ -117,6 +122,7 @@ export default function SummaryPage() {
   // Cloud Sync state
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
   const [lastSyncedTime, setLastSyncedTime] = useState<string>('');
+  const [isReferenceOpen, setIsReferenceOpen] = useState(false);
 
   const fetchFromCloud = async () => {
     try {
@@ -189,7 +195,18 @@ export default function SummaryPage() {
       }
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+
+    // Auto background poll every 15s for concurrent multi-device collaboration
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchFromCloud();
+      }
+    }, 15000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      clearInterval(pollInterval);
+    };
   }, []);
 
   // Formatted date string
@@ -481,6 +498,14 @@ export default function SummaryPage() {
             >
               <Plus className="w-4 h-4" />
               <span>កត់ត្រាការចែកទំនិញទៅហាង (Log Delivery)</span>
+            </button>
+            <button
+              onClick={() => setIsReferenceOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold shadow-xs transition-colors"
+              title="បើកមើលសៀវភៅណែនាំ & REFERENCE ផ្លូវការ"
+            >
+              <FileText className="w-4 h-4 text-emerald-600" />
+              <span>REFERENCE ឯកសារយោង</span>
             </button>
             <Link
               href="/"
@@ -1430,6 +1455,112 @@ export default function SummaryPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* ========================================================================= */}
+      {/* REFERENCE GUIDE MODAL (ឯកសារយោង & របៀបប្រើប្រាស់ផ្លូវការ) */}
+      {/* ========================================================================= */}
+      {isReferenceOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200">
+            {/* Modal Header */}
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/95 backdrop-blur-xs z-10">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                    📘 សៀវភៅណែនាំ &amp; REFERENCE ផ្លូវការ
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    គោលការណ៍រក្សាទុកទិន្នន័យអចិន្ត្រៃយ៍ &amp; ការប្រើប្រាស់ព្រមគ្នាលើ Phone &amp; PC
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsReferenceOpen(false)}
+                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-5 sm:p-6 space-y-4 text-xs sm:text-sm text-slate-700">
+              {/* Section 1 */}
+              <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200/80">
+                <h4 className="font-bold text-emerald-900 flex items-center gap-2 text-sm">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>១. ការរក្សាទុកទិន្នន័យអចិន្ត្រៃយ៍ (Permanent Data Retention)</span>
+                </h4>
+                <p className="text-xs text-emerald-800/90 mt-1 leading-relaxed">
+                  រាល់ពេលដែលលោកអ្នកចុចប៊ូតុង <strong>Save Store Totals</strong> ឬ <strong>Save Stock Log</strong> ទិន្នន័យនឹងត្រូវបញ្ជូនទៅរក្សាទុកជាស្ថាពរលើ Cloud Database និងកត់ត្រាទុកក្នុង Local Storage ម៉ាស៊ីន។ ប្រព័ន្ធប្រើបច្ចេកវិទ្យា <strong>Non-destructive Deep Merge</strong> ដែលធានាថាទិន្នន័យថ្ងៃចាស់ៗ និងសាខាផ្សេងៗ មិនត្រូវបានលុបបាត់ឡើយ។
+                </p>
+              </div>
+
+              {/* Section 2 */}
+              <div className="p-4 rounded-xl bg-indigo-50/50 border border-indigo-200/80">
+                <h4 className="font-bold text-indigo-900 flex items-center gap-2 text-sm">
+                  <Users className="w-4 h-4 text-indigo-600" />
+                  <span>២. ដំណើរការព្រមគ្នាលើ Phone &amp; PC (Concurrent Multi-Device Collaboration)</span>
+                </h4>
+                <p className="text-xs text-indigo-800/90 mt-1 leading-relaxed">
+                  ក្រុមការងារអាចបើកដំណើរការទូរសព្ទ័ដៃ (Mobile) និងកុំព្យូទ័រ (PC) ក្នុងពេលតែមួយ។ ប្រព័ន្ធមានមុខងារ <strong>Auto-Background Polling រៀងរាល់ 15 វិនាទី</strong> និង Re-sync ស្វ័យប្រវត្តិនៅពេលត្រឡប់ចូល Screen វិញ ធ្វើឱ្យលេខដែលបញ្ចូលលើទូរសព្ទ័ នឹងបង្ហាញលើកុំព្យូទ័រដោយស្វ័យប្រវត្តិ។
+                </p>
+              </div>
+
+              {/* Section 3 */}
+              <div className="p-4 rounded-xl bg-purple-50/50 border border-purple-200/80">
+                <h4 className="font-bold text-purple-900 flex items-center gap-2 text-sm">
+                  <History className="w-4 h-4 text-purple-600" />
+                  <span>៣. ការតាមដានប្រវត្តិទិន្នន័យ (Audit Trail &amp; Activity Tracking)</span>
+                </h4>
+                <p className="text-xs text-purple-800/90 mt-1 leading-relaxed">
+                  រាល់ការ Save នីមួយៗ ត្រូវបានបង្កើតជា Audit Log កត់ត្រាទុកនូវ៖ ម៉ោង, ថ្ងៃ, ចំនួន Items, សាខា និងឧបករណ៍ដែលបាន Update (Phone 📱 ឬ PC 💻)។ លោកអ្នកអាចចូលទៅកាន់ Tab <strong>«ប្រវត្តិ &amp; តាមដាន Live Sync»</strong> លើទំព័រដើម ដើម្បីពិនិត្យមើលឡើងវិញ ឬចុចប៊ូតុង «ពិនិត្យមើល» ដើម្បីបើកមើលទិន្នន័យថ្ងៃនោះបានភ្លាមៗ។
+                </p>
+              </div>
+
+              {/* Section 4 */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <h4 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                  <span>៤. សាខាទាំង ១៣ (13 Standard Stores)</span>
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2 text-xs">
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                    <p className="font-bold text-amber-800">Tube Coffee+ (9 ហាង)៖</p>
+                    <p className="text-slate-600 mt-0.5">KPI, TKC, CCV, CDP, CMH, KSH, CKD, 2K4, RTN</p>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-slate-200">
+                    <p className="font-bold text-blue-800">OnMart (4 ហាង)៖</p>
+                    <p className="text-slate-600 mt-0.5">PDK, TK, OU3, DT</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 5 */}
+              <div className="p-4 rounded-xl bg-amber-50/50 border border-amber-200/80">
+                <h4 className="font-bold text-amber-900 flex items-center gap-2 text-sm">
+                  <span>៥. លេខកូដសម្ងាត់ &amp; ការ Backup (PIN &amp; Export)</span>
+                </h4>
+                <p className="text-xs text-amber-800/90 mt-1 leading-relaxed">
+                  • <strong>លេខកូដសម្ងាត់ផ្លូវការ៖</strong> <code className="bg-amber-100 px-1.5 py-0.5 rounded font-black text-amber-900">8899</code> (លេខចាស់ 1234 ត្រូវបាន Block ដាច់ខាត)<br />
+                  • <strong>ការទាញយកទិន្នន័យ Backup៖</strong> អាចចុចប៊ូតុង «Download Backup» លើទំព័រដើម ដើម្បីរក្សាទុកឯកសារ JSON លើម៉ាស៊ីនផ្ទាល់ខ្លួនបានគ្រប់ពេលវេលា។
+                </p>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button
+                onClick={() => setIsReferenceOpen(false)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
+              >
+                យល់ព្រម (Close)
+              </button>
+            </div>
           </div>
         </div>
       )}
