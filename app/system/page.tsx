@@ -732,7 +732,7 @@ export default function CPUSystemApp() {
             </div>
             <div className="text-right text-xs space-y-0.5">
               <p className="font-bold">កាលបរិច្ឆេទរបាយការណ៍ (Date): <span className="font-mono text-sm font-black">{selectedDate}</span></p>
-              <p className="text-slate-600 text-[10px]">កាលបរិច្ឆេទទាញរបាយការណ៍: {new Date().toLocaleString("km-KH")}</p>
+              <p className="text-slate-600 text-[10px]" suppressHydrationWarning>កាលបរិច្ឆេទ: {selectedDate}</p>
               <p className="text-slate-600 text-[10px]">អ្នកចេញរបាយការណ៍: {currentUserName} ({currentUserRole === "ADMIN" ? "Admin" : "Staff"})</p>
             </div>
           </div>
@@ -749,7 +749,7 @@ export default function CPUSystemApp() {
             <div>
               <span className="text-slate-500 block text-[10px]">ចំនួនសរុបប្រចាំថ្ងៃ (Daily Total Units)</span>
               <span className="font-mono font-black text-sm text-slate-900">
-                {activeTab === "stores" ? storeSummary.totalUnits.toLocaleString() : stockSummary.totalOut.toLocaleString()} Items
+                {activeTab === "stores" ? totalStoreUnitsToday.toLocaleString() : stockSummary.totalOut.toLocaleString()} Items
               </span>
             </div>
             <div>
