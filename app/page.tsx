@@ -306,7 +306,23 @@ export default function CPUMainPage() {
       if (savedStores) setStores(JSON.parse(savedStores));
 
       const savedItems = localStorage.getItem("cpu_items");
-      if (savedItems) setItems(JSON.parse(savedItems));
+      if (savedItems) {
+        try {
+          const parsed = JSON.parse(savedItems);
+          if (Array.isArray(parsed) && parsed.length >= 80) {
+            setItems(parsed);
+          } else {
+            setItems(DEFAULT_ITEMS);
+            localStorage.setItem("cpu_items", JSON.stringify(DEFAULT_ITEMS));
+          }
+        } catch {
+          setItems(DEFAULT_ITEMS);
+          localStorage.setItem("cpu_items", JSON.stringify(DEFAULT_ITEMS));
+        }
+      } else {
+        setItems(DEFAULT_ITEMS);
+        localStorage.setItem("cpu_items", JSON.stringify(DEFAULT_ITEMS));
+      }
 
       const savedDist = localStorage.getItem("cpu_history_distribution");
       if (savedDist) setHistoryDistribution(JSON.parse(savedDist));
@@ -602,6 +618,20 @@ export default function CPUMainPage() {
     setIsSupabaseConnected(false);
     setSbNotice("ℹ️ បានសម្អាត Supabase Keys មូលដ្ឋាន។");
     setTimeout(() => setSbNotice(""), 4000);
+  };
+
+  // Restore all 105 starter items
+  const handleRestore105Items = async () => {
+    if (typeof window !== "undefined" && !window.confirm("តើបងពិតជាចង់បញ្ចូលទំនិញទាំង ១០៥ មុខដើមឡើងវិញមែនទេ?")) {
+      return;
+    }
+    const starterItems = buildStarterItems();
+    setItems(starterItems);
+    try {
+      localStorage.setItem("cpu_items", JSON.stringify(starterItems));
+    } catch (e) {}
+    notify("✅ បានបញ្ចូលទំនិញទាំង ១០៥ មុខដូចដើមវិញជោគជ័យ!");
+    await saveToCloud(historyDistribution, historyStock);
   };
 
   // Shift Date helper
@@ -1376,13 +1406,23 @@ export default function CPUMainPage() {
                   </div>
 
                   {currentUserRole === "ADMIN" && (
-                    <button
-                      onClick={() => setShowAddItemModal(true)}
-                      className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shrink-0 shadow-xs cursor-pointer"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>បន្ថែមទំនិញ</span>
-                    </button>
+                    <>
+                      <button
+                        onClick={handleRestore105Items}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-colors shrink-0 shadow-xs cursor-pointer"
+                        title="បញ្ចូលទំនិញទាំង ១០៥ មុខដូចដើមវិញ"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-amber-700" />
+                        <span>Restore 105 Items</span>
+                      </button>
+                      <button
+                        onClick={() => setShowAddItemModal(true)}
+                        className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shrink-0 shadow-xs cursor-pointer"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>បន្ថែមទំនិញ</span>
+                      </button>
+                    </>
                   )}
 
                   <button
@@ -1806,6 +1846,25 @@ export default function CPUMainPage() {
                 )}
               </div>
             </form>
+
+            {/* RESTORE 105 ITEMS BUTTON */}
+            <div className="mt-4 p-4 rounded-xl bg-amber-50/60 border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                  📦 បញ្ចូលទំនិញទាំង ១០៥ មុខដូចដើមវិញ (105 Starter Items)
+                </h4>
+                <p className="text-[11px] text-slate-600">
+                  បច្ចុប្បន្នមាន {items.length} មុខទំនិញ។ ចុចត្រង់នេះដើម្បី Restore ទំនិញស្តង់ដារទាំង ១០៥ មុខ (Tube Coffee &amp; OnMart) មកវិញភ្លាមៗ។
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleRestore105Items}
+                className="px-4 py-2 bg-amber-600 text-white rounded-xl text-xs font-bold hover:bg-amber-700 cursor-pointer transition-colors whitespace-nowrap shadow-xs"
+              >
+                🔄 Restore 105 Items
+              </button>
+            </div>
 
             <div className="mt-6">
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
