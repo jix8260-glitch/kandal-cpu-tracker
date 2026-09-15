@@ -24,6 +24,7 @@ import {
   Award,
   Users,
   Eye,
+  EyeOff,
   LogOut,
   X,
   Boxes,
@@ -122,9 +123,10 @@ export default function CPUMainPage() {
   // --- AUTHENTICATION STATE ---
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<"ADMIN" | "STAFF">("STAFF");
-  const [currentUserName, setCurrentUserName] = useState("");
-  const [inputPasscode, setInputPasscode] = useState("");
-  const [inputUserName, setInputUserName] = useState("");
+  const [currentUserName, setCurrentUserName] = useState("Staff");
+  const [inputPasscode, setInputPasscode] = useState("8899");
+  const [inputUserName, setInputUserName] = useState("Staff");
+  const [showPasscode, setShowPasscode] = useState(false);
   const [loginError, setLoginError] = useState("");
 
   // Passwords
@@ -326,12 +328,17 @@ export default function CPUMainPage() {
       if (savedVer) setAppVersion(savedVer);
 
       // Auto-restore session if logged in
-      const savedUser = sessionStorage.getItem("cpu_current_user");
-      const savedRole = sessionStorage.getItem("cpu_current_role") as "ADMIN" | "STAFF" | null;
+      const savedUser = localStorage.getItem("cpu_current_user") || sessionStorage.getItem("cpu_current_user");
+      const savedRole = (localStorage.getItem("cpu_current_role") || sessionStorage.getItem("cpu_current_role")) as "ADMIN" | "STAFF" | null;
       if (savedUser && savedRole) {
         setCurrentUserName(savedUser);
         setCurrentUserRole(savedRole);
         setIsAuthenticated(true);
+      } else {
+        const lastUser = localStorage.getItem("cpu_last_username");
+        const lastPass = localStorage.getItem("cpu_last_passcode");
+        if (lastUser) setInputUserName(lastUser);
+        if (lastPass) setInputPasscode(lastPass);
       }
     } catch (e) {
       console.error("Failed to load local data", e);
@@ -356,6 +363,23 @@ export default function CPUMainPage() {
   };
 
   // --- LOGIN LOGIC ---
+  const quickLogin = (name: string, role: "ADMIN" | "STAFF", code: string) => {
+    logAccess(name, role);
+    setCurrentUserName(name);
+    setCurrentUserRole(role);
+    setIsAuthenticated(true);
+    setLoginError("");
+    try {
+      localStorage.setItem("cpu_current_user", name);
+      localStorage.setItem("cpu_current_role", role);
+      localStorage.setItem("cpu_last_username", name);
+      localStorage.setItem("cpu_last_passcode", code);
+      sessionStorage.setItem("cpu_current_user", name);
+      sessionStorage.setItem("cpu_current_role", role);
+    } catch (e) {}
+    notify(`សូមស្វាគមន៍ ${name} (${role === "ADMIN" ? "Manager / Admin Mode" : "Staff Mode"})`);
+  };
+
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputUserName.trim()) {
@@ -369,8 +393,14 @@ export default function CPUMainPage() {
       setCurrentUserRole("ADMIN");
       setIsAuthenticated(true);
       setLoginError("");
-      sessionStorage.setItem("cpu_current_user", inputUserName.trim());
-      sessionStorage.setItem("cpu_current_role", "ADMIN");
+      try {
+        localStorage.setItem("cpu_current_user", inputUserName.trim());
+        localStorage.setItem("cpu_current_role", "ADMIN");
+        localStorage.setItem("cpu_last_username", inputUserName.trim());
+        localStorage.setItem("cpu_last_passcode", inputPasscode.trim());
+        sessionStorage.setItem("cpu_current_user", inputUserName.trim());
+        sessionStorage.setItem("cpu_current_role", "ADMIN");
+      } catch (e) {}
       notify(`សូមស្វាគមន៍ ${inputUserName} (Manager / Admin Mode)`);
     } else if (inputPasscode === staffPassword || inputPasscode === "8899" || inputPasscode === "tube1234") {
       logAccess(inputUserName, "STAFF");
@@ -378,8 +408,14 @@ export default function CPUMainPage() {
       setCurrentUserRole("STAFF");
       setIsAuthenticated(true);
       setLoginError("");
-      sessionStorage.setItem("cpu_current_user", inputUserName.trim());
-      sessionStorage.setItem("cpu_current_role", "STAFF");
+      try {
+        localStorage.setItem("cpu_current_user", inputUserName.trim());
+        localStorage.setItem("cpu_current_role", "STAFF");
+        localStorage.setItem("cpu_last_username", inputUserName.trim());
+        localStorage.setItem("cpu_last_passcode", inputPasscode.trim());
+        sessionStorage.setItem("cpu_current_user", inputUserName.trim());
+        sessionStorage.setItem("cpu_current_role", "STAFF");
+      } catch (e) {}
       notify(`សូមស្វាគមន៍ ${inputUserName} (Staff Mode)`);
     } else {
       setLoginError("Password មិនត្រឹមត្រូវទេ! (Staff: 8899, Admin: 0203)");
@@ -404,9 +440,14 @@ export default function CPUMainPage() {
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    setInputPasscode("");
-    sessionStorage.removeItem("cpu_current_user");
-    sessionStorage.removeItem("cpu_current_role");
+    setInputPasscode("8899");
+    setInputUserName("Staff");
+    try {
+      localStorage.removeItem("cpu_current_user");
+      localStorage.removeItem("cpu_current_role");
+      sessionStorage.removeItem("cpu_current_user");
+      sessionStorage.removeItem("cpu_current_role");
+    } catch (e) {}
   };
 
   // --- CURRENT DATE DATA ACCESSORS ---
@@ -603,7 +644,7 @@ export default function CPUMainPage() {
         <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10 w-full max-w-md bg-slate-800/90 border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/60 backdrop-blur-md">
-          <div className="flex flex-col items-center text-center mb-6">
+          <div className="flex flex-col items-center text-center mb-5">
             <div className="h-16 px-6 rounded-2xl bg-black border border-slate-700/80 flex items-center justify-center shadow-inner relative overflow-hidden mb-3">
               <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500" />
               <span className="font-mono text-3xl font-black text-white tracking-[0.2em] pl-1">
@@ -615,7 +656,54 @@ export default function CPUMainPage() {
             <p className="text-[11px] text-slate-400 mt-1">Tube Coffee+ (9 Stores) &amp; OnMart (4 Stores) • 105 Items</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4">
+          {/* Quick 1-Click Auto Login Buttons */}
+          <div className="mb-4">
+            <div className="text-[11px] font-bold text-slate-300 mb-2 flex items-center justify-between">
+              <span>⚡ ចូលភ្លាមៗដោយស្វ័យប្រវត្តិ (Quick Auto Login):</span>
+              <span className="text-[10px] text-emerald-400 font-medium">ចុច ១ ដងចូលភ្លាម</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => quickLogin("Staff", "STAFF", "8899")}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  inputPasscode === "8899"
+                    ? "bg-emerald-950/60 border-emerald-500 text-emerald-300 ring-1 ring-emerald-500"
+                    : "bg-slate-950/70 border-slate-700 hover:border-slate-500 text-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                  <Shield className="w-3.5 h-3.5 shrink-0" />
+                  <span>Staff (8899)</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">ស្វ័យប្រវត្ត • លាក់តម្លៃ</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => quickLogin("Manager", "ADMIN", "0203")}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  inputPasscode === "0203"
+                    ? "bg-amber-950/60 border-amber-500 text-amber-300 ring-1 ring-amber-500"
+                    : "bg-slate-950/70 border-slate-700 hover:border-slate-500 text-slate-300"
+                }`}
+              >
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                  <span>Manager (0203)</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">ស្វ័យប្រវត្ត • មើលតម្លៃ</div>
+              </button>
+            </div>
+          </div>
+
+          <div className="relative flex py-1 items-center mb-3">
+            <div className="flex-grow border-t border-slate-700"></div>
+            <span className="flex-shrink mx-3 text-[10px] text-slate-400 uppercase font-semibold">ឬ បញ្ចូលតាមទម្រង់ខាងក្រោម</span>
+            <div className="flex-grow border-t border-slate-700"></div>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-3.5">
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1">
                 ឈ្មោះ ឬ អត្តលេខអ្នកប្រើប្រាស់ (User Name / ID):
@@ -628,25 +716,39 @@ export default function CPUMainPage() {
                   if (loginError) setLoginError("");
                 }}
                 placeholder="ឧ. បុគ្គលិក A, Manager..."
-                autoFocus
                 className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
-                លេខកូដសម្ងាត់ (Passcode / PIN):
-              </label>
-              <input
-                type="password"
-                value={inputPasscode}
-                onChange={(e) => {
-                  setInputPasscode(e.target.value);
-                  if (loginError) setLoginError("");
-                }}
-                placeholder="PIN (Staff: 8899, Admin: 0203)"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono"
-              />
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-300">
+                  លេខកូដសម្ងាត់ (Passcode / PIN):
+                </label>
+                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                  ✓ បានបំពេញស្វ័យប្រវត្ត {inputPasscode}
+                </span>
+              </div>
+              <div className="relative">
+                <input
+                  type={showPasscode ? "text" : "password"}
+                  value={inputPasscode}
+                  onChange={(e) => {
+                    setInputPasscode(e.target.value);
+                    if (loginError) setLoginError("");
+                  }}
+                  placeholder="PIN (Staff: 8899, Admin: 0203)"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 pr-10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPasscode(!showPasscode)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 cursor-pointer"
+                  title={showPasscode ? "លាក់លេខកូដ" : "បង្ហាញលេខកូដ"}
+                >
+                  {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             {loginError && (
@@ -665,8 +767,8 @@ export default function CPUMainPage() {
             </button>
           </form>
 
-          <div className="mt-6 pt-4 border-t border-slate-700/60 text-[11px] text-slate-400 space-y-1">
-            <p className="font-bold text-slate-300">ℹ️ ព័ត៌មានជំនួយលេខកូដ៖</p>
+          <div className="mt-5 pt-3.5 border-t border-slate-700/60 text-[11px] text-slate-400 space-y-1">
+            <p className="font-bold text-slate-300">ℹ️ ព័ត៌មានជំនួយលេខកូដសម្ងាត់៖</p>
             <p>• <strong>Staff Mode:</strong> <code>8899</code> (លាក់តម្លៃ រក្សាការបញ្ចូលធម្មតា)</p>
             <p>• <strong>Admin / Manager Mode:</strong> <code>0203</code> (មើលតម្លៃ និងគ្រប់គ្រង)</p>
           </div>
