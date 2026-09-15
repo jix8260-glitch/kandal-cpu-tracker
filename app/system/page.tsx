@@ -117,8 +117,8 @@ export default function CPUSystemApp() {
 
   // Passwords (saved in localStorage)
   const [adminPassword, setAdminPassword] = useState("admin8888");
-  const [staffPassword, setStaffPassword] = useState("tube1234");
-  const [appVersion, setAppVersion] = useState("v3.5 Production");
+  const [appVersion, setAppVersion] = useState("v3.6 Production");
+  const [editAppVersion, setEditAppVersion] = useState("v3.6 Production");
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
 
   // --- CORE APP STATE ---
@@ -198,7 +198,10 @@ export default function CPUSystemApp() {
       if (savedLogs) setAccessLogs(JSON.parse(savedLogs));
 
       const savedVer = localStorage.getItem("cpu_app_version");
-      if (savedVer) setAppVersion(savedVer);
+      if (savedVer) {
+        setAppVersion(savedVer);
+        setEditAppVersion(savedVer);
+      }
 
       // Auto-restore session if logged in
       const savedUser = localStorage.getItem("cpu_current_user") || sessionStorage.getItem("cpu_current_user");
@@ -393,11 +396,17 @@ export default function CPUSystemApp() {
     }
     setAdminPassword(editAdminPw);
     setStaffPassword(editStaffPw);
+    if (editAppVersion.trim()) {
+      setAppVersion(editAppVersion.trim());
+    }
     try {
       localStorage.setItem("cpu_admin_pw", editAdminPw);
       localStorage.setItem("cpu_staff_pw", editStaffPw);
+      if (editAppVersion.trim()) {
+        localStorage.setItem("cpu_app_version", editAppVersion.trim());
+      }
     } catch (e) {}
-    setAdminNotice("✅ បានរក្សាទុកលេខសម្ងាត់ថ្មីដោយជោគជ័យ!");
+    setAdminNotice("✅ បានរក្សាទុកលេខសម្ងាត់ និង Version ដោយជោគជ័យ!");
     setTimeout(() => setAdminNotice(""), 3000);
   };
 
@@ -711,8 +720,47 @@ export default function CPUSystemApp() {
 
       {/* MAIN CONTAINER */}
       <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+        {/* PRINT ONLY A4 OFFICIAL REPORT HEADER */}
+        <div className="hidden print:block mb-6 text-black border-b-2 border-slate-900 pb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-black uppercase tracking-wider">Central Production Unit (CPU)</h1>
+              <p className="text-xs text-slate-700 font-bold">Kandal Commissary Kitchen • Tube Coffee+ &amp; OnMart Operations</p>
+              <p className="text-sm font-black text-emerald-800 mt-1">
+                {activeTab === "stores" ? "📋 របាយការណ៍ចែកចាយទំនិញតាមសាខា (Store Distribution Report)" : "📦 របាយការណ៍តុល្យភាពស្តុកប្រចាំថ្ងៃ (Daily Stock Log Report)"}
+              </p>
+            </div>
+            <div className="text-right text-xs space-y-0.5">
+              <p className="font-bold">កាលបរិច្ឆេទរបាយការណ៍ (Date): <span className="font-mono text-sm font-black">{selectedDate}</span></p>
+              <p className="text-slate-600 text-[10px]">កាលបរិច្ឆេទទាញរបាយការណ៍: {new Date().toLocaleString("km-KH")}</p>
+              <p className="text-slate-600 text-[10px]">អ្នកចេញរបាយការណ៍: {currentUserName} ({currentUserRole === "ADMIN" ? "Admin" : "Staff"})</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-4 gap-3 mt-3 p-3 bg-slate-100 rounded-lg text-xs border border-slate-300">
+            <div>
+              <span className="text-slate-500 block text-[10px]">សាខាសរុប (Total Stores)</span>
+              <span className="font-bold text-slate-900">{stores.length} សាខា (Tube 9, OnMart 4)</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px]">ទំនិញសរុប (Total Items)</span>
+              <span className="font-bold text-slate-900">{items.length} មុខទំនិញ</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px]">ចំនួនសរុបប្រចាំថ្ងៃ (Daily Total Units)</span>
+              <span className="font-mono font-black text-sm text-slate-900">
+                {activeTab === "stores" ? storeSummary.totalUnits.toLocaleString() : stockSummary.totalOut.toLocaleString()} Items
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px]">ស្ថានភាពទិន្នន័យ (Data Status)</span>
+              <span className="font-bold text-emerald-700">Verified &amp; Synchronized ✓</span>
+            </div>
+          </div>
+        </div>
+
         {/* HEADER CONTROLS: DATE & NAVIGATION TABS */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
           {/* Date Selector */}
           <div className="flex items-center gap-2">
             <div className="flex items-center bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-bold text-slate-700">
@@ -1191,6 +1239,44 @@ export default function CPUSystemApp() {
             </div>
           </div>
         )}
+
+        {/* OFFICIAL SIGNATURE BLOCK FOR STANDARD A4 PRINT REPORT */}
+        <div className="hidden print:block mt-12 pt-6 border-t-2 border-slate-400 break-inside-avoid">
+          <div className="grid grid-cols-3 gap-8 text-center text-xs text-black">
+            <div className="space-y-16">
+              <p className="font-bold uppercase tracking-wider text-[11px] text-slate-800">
+                រៀបចំដោយ / Prepared by
+              </p>
+              <div>
+                <div className="border-t border-slate-800 w-4/5 mx-auto pt-1"></div>
+                <p className="text-[10px] text-slate-700 font-bold">ហត្ថលេខា និង ឈ្មោះ (Signature &amp; Name)</p>
+                <p className="text-[9px] text-slate-500">កាលបរិច្ឆេទ: ____ / ____ / ________</p>
+              </div>
+            </div>
+
+            <div className="space-y-16">
+              <p className="font-bold uppercase tracking-wider text-[11px] text-slate-800">
+                ត្រួតពិនិត្យដោយ / Checked by
+              </p>
+              <div>
+                <div className="border-t border-slate-800 w-4/5 mx-auto pt-1"></div>
+                <p className="text-[10px] text-slate-700 font-bold">ហត្ថលេខា និង ឈ្មោះ (Signature &amp; Name)</p>
+                <p className="text-[9px] text-slate-500">កាលបរិច្ឆេទ: ____ / ____ / ________</p>
+              </div>
+            </div>
+
+            <div className="space-y-16">
+              <p className="font-bold uppercase tracking-wider text-[11px] text-slate-800">
+                អនុម័តដោយ / Approved by
+              </p>
+              <div>
+                <div className="border-t border-slate-800 w-4/5 mx-auto pt-1"></div>
+                <p className="text-[10px] text-slate-700 font-bold">ហត្ថលេខា និង ឈ្មោះ (Signature &amp; Name)</p>
+                <p className="text-[9px] text-slate-500">កាលបរិច្ឆេទ: ____ / ____ / ________</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </main>
 
       {/* ========================================================================= */}
@@ -1394,9 +1480,9 @@ export default function CPUSystemApp() {
             <form onSubmit={handleSavePasswords} className="mt-4 p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
               <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider">ផ្លាស់ប្តូរលេខសម្ងាត់ (Password Configuration)</h4>
               {adminNotice && <p className="text-xs font-bold text-emerald-600">{adminNotice}</p>}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div>
-                  <label className="block font-bold text-slate-600 mb-1">Admin Passcode:</label>
+                  <label className="block font-bold text-slate-600 mb-1">Admin Passcode (Default: 0203):</label>
                   <input
                     type="password"
                     value={editAdminPw}
@@ -1405,12 +1491,22 @@ export default function CPUSystemApp() {
                   />
                 </div>
                 <div>
-                  <label className="block font-bold text-slate-600 mb-1">Staff Passcode:</label>
+                  <label className="block font-bold text-slate-600 mb-1">Staff Passcode (Default: 8899):</label>
                   <input
                     type="password"
                     value={editStaffPw}
                     onChange={(e) => setEditStaffPw(e.target.value)}
                     className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-600 mb-1">App Version (កំណែប្រព័ន្ធ):</label>
+                  <input
+                    type="text"
+                    value={editAppVersion}
+                    onChange={(e) => setEditAppVersion(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono"
+                    placeholder="v3.6 Production"
                   />
                 </div>
               </div>
