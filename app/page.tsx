@@ -136,6 +136,12 @@ export default function CPUMainPage() {
   const [editAppVersion, setEditAppVersion] = useState("v3.6 Production");
   const [accessLogs, setAccessLogs] = useState<AccessLog[]>([]);
 
+  // Supabase Cloud Connection State
+  const [isSupabaseConnected, setIsSupabaseConnected] = useState(false);
+  const [sbUrl, setSbUrl] = useState("");
+  const [sbKey, setSbKey] = useState("");
+  const [sbNotice, setSbNotice] = useState("");
+
   // --- CORE APP STATE ---
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -220,6 +226,8 @@ export default function CPUMainPage() {
           }
           setHistoryStock((prev) => ({ ...prev, ...stockMap }));
         }
+
+        setIsSupabaseConnected(Boolean(cloudData.supabaseConnected));
 
         setSyncStatus("synced");
         const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -330,6 +338,11 @@ export default function CPUMainPage() {
         setAppVersion(savedVer);
         setEditAppVersion(savedVer);
       }
+
+      const savedSbUrl = localStorage.getItem("supabase_cloud_url");
+      const savedSbKey = localStorage.getItem("supabase_cloud_key");
+      if (savedSbUrl) setSbUrl(savedSbUrl);
+      if (savedSbKey) setSbKey(savedSbKey);
 
       // Auto-restore session if logged in
       const savedUser = localStorage.getItem("cpu_current_user") || sessionStorage.getItem("cpu_current_user");
@@ -560,6 +573,35 @@ export default function CPUMainPage() {
     } catch (e) {}
     setAdminNotice("✅ បានរក្សាទុកលេខសម្ងាត់ និង Version ដោយជោគជ័យ!");
     setTimeout(() => setAdminNotice(""), 3000);
+  };
+
+  // Save Supabase Cloud Configuration
+  const handleSaveSupabaseConfig = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (sbUrl && !sbUrl.startsWith("http")) {
+      setSbNotice("❌ Supabase URL ត្រូវតែចាប់ផ្តើមដោយ https://");
+      return;
+    }
+    try {
+      localStorage.setItem("supabase_cloud_url", sbUrl.trim());
+      localStorage.setItem("supabase_cloud_key", sbKey.trim());
+    } catch (e) {}
+    setSbNotice("✅ បានរក្សាទុកការកំណត់ Supabase! កំពុង Sync ទិន្នន័យ...");
+    fetchFromCloud(true);
+    setTimeout(() => setSbNotice(""), 4000);
+  };
+
+  // Clear Supabase Cloud Configuration
+  const handleClearSupabaseConfig = () => {
+    try {
+      localStorage.removeItem("supabase_cloud_url");
+      localStorage.removeItem("supabase_cloud_key");
+    } catch (e) {}
+    setSbUrl("");
+    setSbKey("");
+    setIsSupabaseConnected(false);
+    setSbNotice("ℹ️ បានសម្អាត Supabase Keys មូលដ្ឋាន។");
+    setTimeout(() => setSbNotice(""), 4000);
   };
 
   // Shift Date helper
@@ -813,17 +855,27 @@ export default function CPUMainPage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Cloud Sync Status */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-50 border border-slate-200 text-slate-600">
+            {/* Cloud Sync & Supabase Status */}
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border transition-colors ${
+              isSupabaseConnected 
+                ? "bg-emerald-50 border-emerald-300 text-emerald-800" 
+                : "bg-slate-50 border-slate-200 text-slate-600"
+            }`}>
               {syncStatus === "syncing" && (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-500" />
                   <span>Syncing...</span>
                 </>
               )}
-              {syncStatus === "synced" && (
+              {syncStatus !== "syncing" && isSupabaseConnected && (
                 <>
-                  <Cloud className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Supabase Live 🟢</span>
+                </>
+              )}
+              {syncStatus === "synced" && !isSupabaseConnected && (
+                <>
+                  <Cloud className="w-3.5 h-3.5 text-blue-500" />
                   <span>Cloud Synced</span>
                 </>
               )}
@@ -833,7 +885,7 @@ export default function CPUMainPage() {
                   <span>Offline</span>
                 </>
               )}
-              {syncStatus === "idle" && (
+              {syncStatus === "idle" && !isSupabaseConnected && (
                 <>
                   <Cloud className="w-3.5 h-3.5 text-slate-400" />
                   <span>Cloud Ready</span>
@@ -1693,6 +1745,66 @@ export default function CPUMainPage() {
               >
                 Save New Passwords
               </button>
+            </form>
+
+            {/* SUPABASE CLOUD DATABASE CONFIGURATION */}
+            <form onSubmit={handleSaveSupabaseConfig} className="mt-4 p-4 rounded-xl bg-emerald-50/50 border border-emerald-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
+                    Supabase Cloud Database (PostgreSQL)
+                  </h4>
+                </div>
+                <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                  isSupabaseConnected ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-700"
+                }`}>
+                  {isSupabaseConnected ? "🟢 Connected" : "🟡 Not Connected"}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600">
+                ភ្ជាប់ទៅកាន់ Cloud Database ផ្ទាល់ខ្លួន ដើម្បីរក្សាទុកទិន្នន័យទូទាំងសាខា និងទូរស័ព្ទទាំងអស់បានអចិន្ត្រៃយ៍។
+              </p>
+              {sbNotice && <p className="text-xs font-bold text-emerald-700">{sbNotice}</p>}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="block font-bold text-slate-600 mb-1">Project URL (NEXT_PUBLIC_SUPABASE_URL):</label>
+                  <input
+                    type="text"
+                    value={sbUrl}
+                    onChange={(e) => setSbUrl(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono text-[11px]"
+                    placeholder="https://xyzcompany.supabase.co"
+                  />
+                </div>
+                <div>
+                  <label className="block font-bold text-slate-600 mb-1">Anon Public Key (NEXT_PUBLIC_SUPABASE_ANON_KEY):</label>
+                  <input
+                    type="password"
+                    value={sbKey}
+                    onChange={(e) => setSbKey(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-mono text-[11px]"
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+                  />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-bold hover:bg-emerald-700 cursor-pointer transition-colors shadow-xs"
+                >
+                  Save &amp; Connect Supabase
+                </button>
+                {sbUrl && (
+                  <button
+                    type="button"
+                    onClick={handleClearSupabaseConfig}
+                    className="px-3 py-2 bg-slate-200 text-slate-700 rounded-xl text-xs font-bold hover:bg-slate-300 cursor-pointer transition-colors"
+                  >
+                    Clear Keys
+                  </button>
+                )}
+              </div>
             </form>
 
             <div className="mt-6">
