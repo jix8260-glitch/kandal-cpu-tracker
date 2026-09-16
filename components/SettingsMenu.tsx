@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { 
   Settings, Shield, Users, FileText, 
   Printer, LogOut, ChevronDown, ExternalLink, Sliders,
-  BarChart3
+  BarChart3,
+  Boxes
 } from 'lucide-react';
 
 interface SettingsMenuProps {
@@ -138,6 +139,24 @@ export default function SettingsMenu({
                 <div>
                   <div>Store Summary</div>
                   <div className="text-[10px] text-slate-400 font-normal">13 Stores Daily Breakdown</div>
+                </div>
+              </div>
+              <ExternalLink className="w-3 h-3 text-slate-400" />
+            </Link>
+
+            {/* Kitchen Dashboard (Safe PIN Terminal) */}
+            <Link
+              href="/dashboard"
+              onClick={() => setIsOpen(false)}
+              className="w-full text-left flex items-center justify-between px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-colors"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Boxes className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <div>Kitchen Dashboard</div>
+                  <div className="text-[10px] text-slate-400 font-normal">Safe PIN Terminal &amp; Stores</div>
                 </div>
               </div>
               <ExternalLink className="w-3 h-3 text-slate-400" />
