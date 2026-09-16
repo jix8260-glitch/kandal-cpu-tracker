@@ -33,10 +33,13 @@ import {
   RefreshCw,
   Cloud,
   CloudOff,
-  BarChart3
+  BarChart3,
+  QrCode
 } from "lucide-react";
 import { STARTER_ITEMS } from "@/lib/starter-items";
 import { AuditLogEntry } from "@/lib/types";
+import QRCodeModal from "@/components/QRCodeModal";
+import ApprovalQueue from "@/components/ApprovalQueue";
 
 // =========================================================================
 // 1. DATA TYPES & INTERFACES
@@ -167,6 +170,7 @@ export default function CPUMainPage() {
   const [showAdminModal, setShowAdminModal] = useState(false);
   const [showAddStoreModal, setShowAddStoreModal] = useState(false);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
   // Form State for Add Store
@@ -957,6 +961,16 @@ export default function CPUMainPage() {
               </span>
             </div>
 
+            {/* QR Code Request Access Button */}
+            <button
+              onClick={() => setShowQRModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold border border-indigo-200 transition-colors shadow-xs cursor-pointer"
+              title="បង្ហាញ QR Code សម្រាប់បុគ្គលិកស្កេនទូរស័ព្ទលើ Wi-Fi"
+            >
+              <QrCode className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="hidden sm:inline">QR Access</span>
+            </button>
+
             {/* Admin Settings Button (Visible for ADMIN) */}
             {currentUserRole === "ADMIN" && (
               <button
@@ -968,6 +982,16 @@ export default function CPUMainPage() {
                 <span className="hidden sm:inline">Settings &amp; Logs</span>
               </button>
             )}
+
+            {/* Owner Admin Console Link */}
+            <Link
+              href="/admin"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
+              title="ទៅកាន់ Owner / Master Security Console"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Owner Console</span>
+            </Link>
 
             {/* Print Button */}
             <button
@@ -1031,6 +1055,14 @@ export default function CPUMainPage() {
               <span className="font-bold text-emerald-700">Verified &amp; Synchronized ✓</span>
             </div>
           </div>
+        </div>
+
+        {/* REAL-TIME APPROVAL QUEUE (STAFF QR REQUESTS) */}
+        <div className="print:hidden">
+          <ApprovalQueue
+            currentUserName={currentUserName}
+            onLedgerUpdate={() => fetchFromCloud(false)}
+          />
         </div>
 
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
@@ -1910,6 +1942,9 @@ export default function CPUMainPage() {
           </div>
         </div>
       )}
+
+      {/* QR CODE ACCESS MODAL */}
+      <QRCodeModal isOpen={showQRModal} onClose={() => setShowQRModal(false)} />
     </div>
   );
 }

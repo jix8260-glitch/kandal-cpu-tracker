@@ -31,3 +31,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local secure data & backups (prevent data leaks)
+data/
+*.db
+*.db.json
+*.tmp
