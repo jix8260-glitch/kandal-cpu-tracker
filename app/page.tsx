@@ -40,6 +40,7 @@ import { STARTER_ITEMS } from "@/lib/starter-items";
 import { AuditLogEntry } from "@/lib/types";
 import QRCodeModal from "@/components/QRCodeModal";
 import ApprovalQueue from "@/components/ApprovalQueue";
+import SettingsMenu from "@/components/SettingsMenu";
 
 // =========================================================================
 // 1. DATA TYPES & INTERFACES
@@ -937,15 +938,6 @@ export default function CPUMainPage() {
               <span>Sync 🔄</span>
             </button>
 
-            {/* Link to Store Summary */}
-            <Link
-              href="/summary"
-              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold border border-indigo-200 transition-colors"
-            >
-              <BarChart3 className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Store Summary ↗</span>
-            </Link>
-
             {/* User & Role Badge */}
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs">
               <Users className="w-3.5 h-3.5 text-slate-600" />
@@ -961,7 +953,7 @@ export default function CPUMainPage() {
               </span>
             </div>
 
-            {/* QR Code Request Access Button */}
+            {/* Quick QR Access Button */}
             <button
               onClick={() => setShowQRModal(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold border border-indigo-200 transition-colors shadow-xs cursor-pointer"
@@ -971,47 +963,25 @@ export default function CPUMainPage() {
               <span className="hidden sm:inline">QR Access</span>
             </button>
 
-            {/* Admin Settings Button (Visible for ADMIN) */}
-            {currentUserRole === "ADMIN" && (
-              <button
-                onClick={() => setShowAdminModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-300 transition-colors"
-                title="ការកំណត់ប្រព័ន្ធ Admin & Logs"
-              >
-                <Settings className="w-3.5 h-3.5 text-slate-600" />
-                <span className="hidden sm:inline">Settings &amp; Logs</span>
-              </button>
-            )}
-
-            {/* Owner Admin Console Link */}
-            <Link
-              href="/admin"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors shadow-xs"
-              title="ទៅកាន់ Owner / Master Security Console"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span className="hidden sm:inline">Owner Console</span>
-            </Link>
-
-            {/* Print Button */}
+            {/* Quick Print Button */}
             <button
               onClick={() => window.print()}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-300 transition-colors"
+              className="hidden md:flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-300 transition-colors"
               title="បោះពុម្ពរបាយការណ៍"
             >
               <Printer className="w-3.5 h-3.5 text-slate-600" />
-              <span className="hidden sm:inline">Print</span>
+              <span>Print</span>
             </button>
 
-            {/* Logout Button */}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold border border-rose-200 transition-colors"
-              title="ចាកចេញពីគណនី (Logout)"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">ចាកចេញ</span>
-            </button>
+            {/* Consolidated Settings & Tools Dropdown Menu */}
+            <SettingsMenu
+              currentUserName={currentUserName}
+              currentUserRole={currentUserRole}
+              onOpenQR={() => setShowQRModal(true)}
+              onOpenSettings={() => setShowAdminModal(true)}
+              onPrint={() => window.print()}
+              onLogout={handleLogout}
+            />
           </div>
         </div>
       </header>
