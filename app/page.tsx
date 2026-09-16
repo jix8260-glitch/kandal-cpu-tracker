@@ -520,10 +520,26 @@ export default function CPUMainPage() {
     } catch (e) {}
   };
 
+  const handleOpeningStockChange = (itemCode: string, amount: number) => {
+    const val = isNaN(amount) || amount < 0 ? 0 : amount;
+    setItems((prevItems) => {
+      const updated = prevItems.map((it) =>
+        it.item_code === itemCode ? { ...it, opening_stock: val } : it
+      );
+      try {
+        localStorage.setItem("cpu_items", JSON.stringify(updated));
+      } catch (e) {}
+      return updated;
+    });
+  };
+
   const handleSaveStock = async () => {
     notify("កំពុង Save ទៅ Cloud & Device...");
+    try {
+      localStorage.setItem("cpu_items", JSON.stringify(items));
+    } catch (e) {}
     await saveToCloud(historyDistribution, historyStock);
-    notify("✅ បានរក្សាទុកស្តុកទៅ Cloud & Phone រួចរាល់!");
+    notify("✅ បានរក្សាទុកស្តុក និង Opening Stock រួចរាល់!");
   };
 
   // Add Store
@@ -1407,24 +1423,24 @@ export default function CPUMainPage() {
                     />
                   </div>
 
+                  <button
+                    onClick={() => setShowAddItemModal(true)}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shrink-0 shadow-xs cursor-pointer"
+                    title="បន្ថែមមុខទំនិញថ្មីចូលស្តុក (Add Item)"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ បន្ថែមទំនិញ (Add Item)</span>
+                  </button>
+
                   {currentUserRole === "ADMIN" && (
-                    <>
-                      <button
-                        onClick={handleRestore105Items}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-colors shrink-0 shadow-xs cursor-pointer"
-                        title="បញ្ចូលទំនិញទាំង ១០៥ មុខដូចដើមវិញ"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5 text-amber-700" />
-                        <span>Restore 105 Items</span>
-                      </button>
-                      <button
-                        onClick={() => setShowAddItemModal(true)}
-                        className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-colors shrink-0 shadow-xs cursor-pointer"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>បន្ថែមទំនិញ</span>
-                      </button>
-                    </>
+                    <button
+                      onClick={handleRestore105Items}
+                      className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-colors shrink-0 shadow-xs cursor-pointer"
+                      title="បញ្ចូលទំនិញទាំង ១០៥ មុខដូចដើមវិញ"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 text-amber-700" />
+                      <span className="hidden sm:inline">Restore 105 Items</span>
+                    </button>
                   )}
 
                   <button
@@ -1446,7 +1462,7 @@ export default function CPUMainPage() {
                       <th className="py-3 px-4">ប្រភេទ</th>
                       <th className="py-3 px-4">UOM</th>
                       {currentUserRole === "ADMIN" && <th className="py-3 px-4 text-right">CPU ($)</th>}
-                      <th className="py-3 px-4 text-right">Opening</th>
+                      <th className="py-3 px-4 text-right bg-blue-50/70 text-blue-900 font-black">OPENING</th>
                       <th className="py-3 px-4 text-right bg-emerald-50/60 text-emerald-900">Stock IN</th>
                       <th className="py-3 px-4 text-right bg-rose-50/60 text-rose-900">Stock OUT</th>
                       <th className="py-3 px-4 text-right font-black">Balance</th>
@@ -1475,7 +1491,17 @@ export default function CPUMainPage() {
                             </td>
                           )}
 
-                          <td className="py-3 px-4 text-right font-mono text-slate-600">{item.opening_stock}</td>
+                          <td className="py-3 px-4 text-right bg-blue-50/30">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.opening_stock === 0 ? "" : item.opening_stock}
+                              placeholder="0"
+                              onChange={(e) => handleOpeningStockChange(item.item_code, parseFloat(e.target.value) || 0)}
+                              className="w-20 text-right bg-white border border-blue-300 focus:border-blue-600 rounded-lg px-2.5 py-1 font-mono font-bold text-blue-900 text-xs focus:outline-none"
+                              title="កែប្រែទិន្នន័យស្តុកដើមគ្រា (Opening Stock)"
+                            />
+                          </td>
 
                           <td className="py-3 px-4 text-right bg-emerald-50/30">
                             <input
