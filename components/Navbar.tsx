@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Calendar, BarChart3, Printer } from 'lucide-react';
+import { Calendar, BarChart3, Printer, Package } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { useAuth } from './AuthLock';
 import SettingsMenu from './SettingsMenu';
@@ -18,6 +18,7 @@ export const Navbar: React.FC = () => {
   const navLinks = [
     { href: '/', label: 'Daily Stock Tracker', icon: <Calendar className="w-4 h-4" /> },
     { href: '/summary', label: 'Store Summary (១៣ ហាង)', icon: <BarChart3 className="w-4 h-4" /> },
+    { href: '/items', label: 'Master Items ($)', icon: <Package className="w-4 h-4" /> },
   ];
 
   return (

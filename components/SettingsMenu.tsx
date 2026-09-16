@@ -6,7 +6,8 @@ import {
   Settings, Users, FileText, 
   Printer, LogOut, ChevronDown, ExternalLink, Sliders,
   BarChart3,
-  Boxes
+  Boxes,
+  Package
 } from 'lucide-react';
 
 interface SettingsMenuProps {
@@ -139,6 +140,24 @@ export default function SettingsMenu({
                 <div>
                   <div>Kitchen Dashboard</div>
                   <div className="text-[10px] text-slate-400 font-normal">Safe PIN Terminal &amp; Stores</div>
+                </div>
+              </div>
+              <ExternalLink className="w-3 h-3 text-slate-400" />
+            </Link>
+
+            {/* Master Items & CPU Pricing */}
+            <Link
+              href="/items"
+              onClick={() => setIsOpen(false)}
+              className="w-full text-left flex items-center justify-between px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-emerald-600 transition-colors"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Package className="w-3.5 h-3.5" />
+                </div>
+                <div>
+                  <div>Master Items ($)</div>
+                  <div className="text-[10px] text-slate-400 font-normal">Key In Prices &amp; Sync to Summary</div>
                 </div>
               </div>
               <ExternalLink className="w-3 h-3 text-slate-400" />

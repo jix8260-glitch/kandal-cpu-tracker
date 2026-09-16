@@ -174,6 +174,13 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Upsert item prices into item_master
+        if (incomingPrices && typeof incomingPrices === 'object' && Object.keys(incomingPrices).length > 0) {
+          for (const [code, price] of Object.entries(incomingPrices)) {
+            await supabase.from('item_master').update({ cpu: Number(price) || 0 }).eq('code', code);
+          }
+        }
+
         // Insert access/audit log
         if (customAuditLog) {
           await supabase.from('access_logs').insert([{

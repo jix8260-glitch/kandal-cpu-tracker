@@ -148,10 +148,14 @@ export default function SummaryPage() {
   const [deliveryQty, setDeliveryQty] = useState<number>(0);
   const [deliverySuccessMsg, setDeliverySuccessMsg] = useState<string>('');
 
-  // All 105 starter items
+  // All 105 starter items with dynamic CPU from Master Items
   const allItems: StockItem[] = useMemo(() => {
-    return getNormalizedStarterItems() as StockItem[];
-  }, []);
+    const starters = getNormalizedStarterItems() as StockItem[];
+    return starters.map((it) => ({
+      ...it,
+      cpu: v5Prices[it.code] !== undefined ? v5Prices[it.code] : it.cpu,
+    }));
+  }, [v5Prices]);
 
   // Stock logs from LocalStorage
   const [storedLogs, setStoredLogs] = useState<
@@ -239,6 +243,23 @@ export default function SummaryPage() {
 
       const rawV5Prices = localStorage.getItem('kandal_cpu_item_prices_v5');
       if (rawV5Prices) setV5Prices(JSON.parse(rawV5Prices));
+
+      const rawCpuItems = localStorage.getItem('cpu_items');
+      if (rawCpuItems) {
+        try {
+          const parsed = JSON.parse(rawCpuItems);
+          if (Array.isArray(parsed)) {
+            const extractedPrices: Record<string, number> = {};
+            parsed.forEach((it: any) => {
+              const c = it.code || it.item_code;
+              if (c && it.cpu !== undefined) {
+                extractedPrices[c] = Number(it.cpu) || 0;
+              }
+            });
+            setV5Prices((prev) => ({ ...extractedPrices, ...prev }));
+          }
+        } catch (e) {}
+      }
 
       const rawHistDist = localStorage.getItem('cpu_history_distribution');
       if (rawHistDist) setHistoryDistribution(JSON.parse(rawHistDist));
@@ -482,8 +503,9 @@ export default function SummaryPage() {
         dayStock.forEach((i) => {
           if (i.brand === (store.brand === 'TUBE_COFFEE' ? 'Tube Coffee' : 'OnMart')) {
             const bal = (i.opening_stock || 0) + (i.stock_in || 0) - (i.stock_out || 0);
-            if (bal > 0 && (i.cpu || 0) > 0) {
-              storeTotalStockValue += (bal * i.cpu) * (1 / (store.brand === 'TUBE_COFFEE' ? 9 : 4));
+            const itemPrice = v5Prices[i.item_code] !== undefined ? v5Prices[i.item_code] : (i.cpu || 0);
+            if (bal > 0 && itemPrice > 0) {
+              storeTotalStockValue += (bal * itemPrice) * (1 / (store.brand === 'TUBE_COFFEE' ? 9 : 4));
             }
           }
         });
@@ -1095,6 +1117,20 @@ export default function SummaryPage() {
               <Layers className="w-3.5 h-3.5" />
               <span>4. Master Table (តារាងប្រៀបធៀប)</span>
             </button>
+
+            <Link
+              href="/items"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-black transition-all text-xs shadow-2xs"
+              title="កំណត់តម្លៃទំនិញ Master Items (Key In Prices)"
+            >
+              <Package className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Master Items ($) ↗</span>
+              {Object.keys(v5Prices).filter((k) => v5Prices[k] > 0).length > 0 && (
+                <span className="px-1.5 py-0.5 bg-emerald-600 text-white rounded-md text-[10px] font-mono font-black">
+                  {Object.keys(v5Prices).filter((k) => v5Prices[k] > 0).length} Set
+                </span>
+              )}
+            </Link>
           </div>
 
           {/* Quick Search */}
