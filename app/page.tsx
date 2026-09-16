@@ -150,7 +150,7 @@ export default function CPUMainPage() {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const [activeTab, setActiveTab] = useState<"stores" | "stock">("stores");
+  const [activeTab, setActiveTab] = useState<"stores" | "stock">("stock");
   const [selectedBrand, setSelectedBrand] = useState<"ALL" | "Tube Coffee" | "OnMart">("ALL");
   const [selectedCategory, setSelectedCategory] = useState("ALL");
   const [searchTerm, setSearchTerm] = useState("");
@@ -1079,17 +1079,6 @@ export default function CPUMainPage() {
 
           <div className="flex items-center bg-slate-100 p-1.5 rounded-xl border border-slate-200 gap-1 shrink-0">
             <button
-              onClick={() => { setActiveTab("stores"); setSearchTerm(""); }}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
-                activeTab === "stores"
-                  ? "bg-white text-indigo-700 shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Store className="w-4 h-4" />
-              <span>សរុបតាមសាខា (Store Distribution)</span>
-            </button>
-            <button
               onClick={() => { setActiveTab("stock"); setSearchTerm(""); }}
               className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
                 activeTab === "stock"
@@ -1099,6 +1088,17 @@ export default function CPUMainPage() {
             >
               <Package className="w-4 h-4" />
               <span>ស្តុកចេញ-ចូល (Stock In-Out)</span>
+            </button>
+            <button
+              onClick={() => { setActiveTab("stores"); setSearchTerm(""); }}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+                activeTab === "stores"
+                  ? "bg-white text-indigo-700 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Store className="w-4 h-4" />
+              <span>សរុបតាមសាខា (Store Distribution)</span>
             </button>
           </div>
         </div>
