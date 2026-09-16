@@ -491,21 +491,6 @@ export default function SummaryPage() {
                 <span>Sync Cloud 🔄</span>
               </button>
             </div>
-
-            <button
-              onClick={() => setIsDeliveryModalOpen(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              <span>កត់ត្រាការចែកទំនិញទៅហាង (Log Delivery)</span>
-            </button>
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors"
-            >
-              <Calendar className="w-4 h-4 text-emerald-400" />
-              <span>ទៅកាន់ Daily Stock</span>
-            </Link>
           </div>
         </div>
 
