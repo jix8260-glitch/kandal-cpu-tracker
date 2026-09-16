@@ -30,7 +30,9 @@ import {
   X,
   ShieldCheck,
   Users,
-  History
+  History,
+  Activity,
+  ShoppingBag
 } from 'lucide-react';
 import {
   StockItem,
@@ -41,6 +43,7 @@ import {
   StoreBranch
 } from '@/lib/types';
 import { getNormalizedStarterItems } from '@/lib/starter-items';
+import { StoreRecord, getAllDistributions } from '@/lib/inventoryStore';
 
 const YEARS = [2024, 2025, 2026, 2027, 2028];
 const MONTHS = [
@@ -75,6 +78,56 @@ const STORE_WEIGHTS: Record<string, number> = {
   DT: 0.20,
 };
 
+// Store ID and code mappings to support legacy and current keys
+const STORE_ID_MAP: Record<string, string> = {
+  s1: 'KPI',
+  s2: 'TKC',
+  s3: 'CCV',
+  s4: 'CDP',
+  s5: 'CMH',
+  s6: 'KSH',
+  s7: 'CKD',
+  s8: '2K4',
+  s9: 'RTN',
+  s10: 'PDK',
+  s11: 'TK',
+  s12: 'OU3',
+  s13: 'DT',
+};
+
+const STORE_CODE_TO_ID: Record<string, string> = {
+  KPI: 's1',
+  TKC: 's2',
+  CCV: 's3',
+  CDP: 's4',
+  CMH: 's5',
+  CYH: 's5',
+  KSH: 's6',
+  CKD: 's7',
+  '2K4': 's8',
+  RTN: 's9',
+  ATN: 's9',
+  PDK: 's10',
+  POK: 's10',
+  TK: 's11',
+  OU3: 's12',
+  DT: 's13',
+};
+
+// Store code/alias matcher
+const isStoreMatch = (sourceCodeOrId: string, targetCode: string): boolean => {
+  if (!sourceCodeOrId || !targetCode) return false;
+  const s = sourceCodeOrId.trim().toUpperCase();
+  const t = targetCode.trim().toUpperCase();
+  if (s === t) return true;
+  if (STORE_ID_MAP[sourceCodeOrId.toLowerCase()]?.toUpperCase() === t) return true;
+  if (STORE_CODE_TO_ID[t]?.toLowerCase() === sourceCodeOrId.toLowerCase()) return true;
+  if ((s === 'CYH' && t === 'CMH') || (s === 'CMH' && t === 'CYH')) return true;
+  if ((s === 'ATN' && t === 'RTN') || (s === 'RTN' && t === 'ATN')) return true;
+  if ((s === 'POK' && t === 'PDK') || (s === 'PDK' && t === 'POK')) return true;
+  return false;
+};
+
 export default function SummaryPage() {
   const currentDate = new Date();
   const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
@@ -83,7 +136,7 @@ export default function SummaryPage() {
   const [selectedBrand, setSelectedBrand] = useState<FilterLocation>('ALL');
   const [selectedStoreCode, setSelectedStoreCode] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'DAILY' | 'MONTHLY' | 'YEARLY' | 'ALL_MATRIX'>('DAILY');
+  const [activeTab, setActiveTab] = useState<'TRACKER' | 'DAILY' | 'MONTHLY' | 'YEARLY' | 'ALL_MATRIX'>('TRACKER');
 
   // Modal detail for a store
   const [activeDetailStore, setActiveDetailStore] = useState<StoreBranch | null>(null);
@@ -118,6 +171,12 @@ export default function SummaryPage() {
     Record<string, Array<{ item_code: string; description_khmer: string; brand: string; cpu: number; opening_stock: number; stock_in: number; stock_out: number }>>
   >({});
   const [v5Prices, setV5Prices] = useState<Record<string, number>>({});
+
+  // cpu_history_distribution (Recorded from Main Dashboard / page.tsx)
+  const [historyDistribution, setHistoryDistribution] = useState<Record<string, Record<string, number>>>({});
+
+  // kandal_cpu_daily_store_distributions (Recorded from DailyStoreDistribution / inventoryStore.ts)
+  const [dailyStoreDistributions, setDailyStoreDistributions] = useState<StoreRecord[]>([]);
 
   // Cloud Sync state
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
@@ -163,27 +222,40 @@ export default function SummaryPage() {
     }
   };
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const rawLogs = localStorage.getItem('kandal_cpu_stock_logs');
-        if (rawLogs) setStoredLogs(JSON.parse(rawLogs));
+  const loadLocalData = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const rawLogs = localStorage.getItem('kandal_cpu_stock_logs');
+      if (rawLogs) setStoredLogs(JSON.parse(rawLogs));
 
-        const rawDispatches = localStorage.getItem('kandal_cpu_store_dispatches');
-        if (rawDispatches) setStoreDispatches(JSON.parse(rawDispatches));
+      const rawDispatches = localStorage.getItem('kandal_cpu_store_dispatches');
+      if (rawDispatches) setStoreDispatches(JSON.parse(rawDispatches));
 
-        const rawV5Stores = localStorage.getItem('kandal_cpu_stores_by_date_v5');
-        if (rawV5Stores) setV5Stores(JSON.parse(rawV5Stores));
+      const rawV5Stores = localStorage.getItem('kandal_cpu_stores_by_date_v5');
+      if (rawV5Stores) setV5Stores(JSON.parse(rawV5Stores));
 
-        const rawV5Stock = localStorage.getItem('kandal_cpu_stock_by_date_v5');
-        if (rawV5Stock) setV5Stock(JSON.parse(rawV5Stock));
+      const rawV5Stock = localStorage.getItem('kandal_cpu_stock_by_date_v5');
+      if (rawV5Stock) setV5Stock(JSON.parse(rawV5Stock));
 
-        const rawV5Prices = localStorage.getItem('kandal_cpu_item_prices_v5');
-        if (rawV5Prices) setV5Prices(JSON.parse(rawV5Prices));
-      } catch (e) {
-        console.error('Error loading logs', e);
+      const rawV5Prices = localStorage.getItem('kandal_cpu_item_prices_v5');
+      if (rawV5Prices) setV5Prices(JSON.parse(rawV5Prices));
+
+      const rawHistDist = localStorage.getItem('cpu_history_distribution');
+      if (rawHistDist) setHistoryDistribution(JSON.parse(rawHistDist));
+
+      const rawDailyDist = localStorage.getItem('kandal_cpu_daily_store_distributions');
+      if (rawDailyDist) {
+        setDailyStoreDistributions(JSON.parse(rawDailyDist));
+      } else {
+        setDailyStoreDistributions(getAllDistributions());
       }
+    } catch (e) {
+      console.error('Error loading logs', e);
     }
+  };
+
+  useEffect(() => {
+    loadLocalData();
 
     // Pull from cloud
     fetchFromCloud();
@@ -191,10 +263,18 @@ export default function SummaryPage() {
     // Pull on tab focus / visible
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
+        loadLocalData();
         fetchFromCloud();
       }
     };
     document.addEventListener('visibilitychange', onVisibilityChange);
+
+    // Listen for storage events across tabs & custom dispatch
+    const handleStorageUpdate = () => {
+      loadLocalData();
+    };
+    window.addEventListener('storage', handleStorageUpdate);
+    window.addEventListener('storage_updated', handleStorageUpdate);
 
     // Auto background poll every 15s for concurrent multi-device collaboration
     const pollInterval = setInterval(() => {
@@ -205,11 +285,13 @@ export default function SummaryPage() {
 
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('storage', handleStorageUpdate);
+      window.removeEventListener('storage_updated', handleStorageUpdate);
       clearInterval(pollInterval);
     };
   }, []);
 
-  // Formatted date string
+  // Formatted date string (YYYY-MM-DD)
   const selectedDateStr = useMemo(() => {
     const mm = String(selectedMonth).padStart(2, '0');
     const dd = String(selectedDay).padStart(2, '0');
@@ -273,117 +355,134 @@ export default function SummaryPage() {
     return list;
   }, [selectedBrand, selectedStoreCode, searchQuery]);
 
+  // Helper to extract items delivered to a specific store on a specific date across all storage sources
+  const getStoreUnitsOnDate = (storeCode: string, dateStr: string): number => {
+    // 1. Daily store distribution from inventoryStore / DailyStoreDistribution
+    const dailyRec = dailyStoreDistributions.find(
+      (r) => r.date === dateStr && isStoreMatch(r.storeCode, storeCode)
+    );
+    const dailyDistQty = dailyRec ? Number(dailyRec.itemCount) || 0 : 0;
+
+    // 2. cpu_history_distribution from Main Dashboard in page.tsx
+    let histQty = 0;
+    const dayHist = historyDistribution[dateStr];
+    if (dayHist) {
+      for (const [k, v] of Object.entries(dayHist)) {
+        if (isStoreMatch(k, storeCode)) {
+          histQty = Math.max(histQty, Number(v) || 0);
+        }
+      }
+    }
+
+    // 3. v5 stores
+    let v5Qty = 0;
+    const dayV5List = v5Stores[dateStr];
+    if (dayV5List && Array.isArray(dayV5List)) {
+      const matched = dayV5List.find((s) => isStoreMatch(s.code || s.id, storeCode));
+      if (matched) {
+        v5Qty = Number(matched.dailyAmount) || 0;
+      }
+    }
+
+    // 4. Manual item dispatches
+    let dispatchQty = 0;
+    const dayDispatches = storeDispatches[dateStr];
+    if (dayDispatches) {
+      for (const [stKey, itemMap] of Object.entries(dayDispatches)) {
+        if (isStoreMatch(stKey, storeCode)) {
+          dispatchQty += Object.values(itemMap).reduce((sum, q) => sum + (Number(q) || 0), 0);
+        }
+      }
+    }
+
+    const baseCount = Math.max(dailyDistQty, histQty, v5Qty);
+    return baseCount > 0 ? baseCount : dispatchQty;
+  };
+
+  // Collect all unique recorded dates across all data sources
+  const allRecordedDates = useMemo(() => {
+    const set = new Set<string>();
+    Object.keys(historyDistribution).forEach((d) => set.add(d));
+    Object.keys(v5Stores).forEach((d) => set.add(d));
+    Object.keys(storeDispatches).forEach((d) => set.add(d));
+    dailyStoreDistributions.forEach((r) => {
+      if (r.date) set.add(r.date);
+    });
+    set.add(selectedDateStr);
+    return Array.from(set);
+  }, [historyDistribution, v5Stores, storeDispatches, dailyStoreDistributions, selectedDateStr]);
+
   // Aggregate stats per store (DAILY, MONTHLY, YEARLY)
   const storeAnalytics = useMemo(() => {
     const monthPrefix = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
     const yearPrefix = `${selectedYear}-`;
 
+    const monthDates = allRecordedDates.filter((d) => d.startsWith(monthPrefix));
+    const yearDates = allRecordedDates.filter((d) => d.startsWith(yearPrefix));
+
     return ALL_STORES.map((store) => {
       const storeItems = allItems.filter((it) => it.location === store.brand);
       const itemsCount = storeItems.length; // 69 for Tube Coffee+, 36 for OnMart
 
-      // Match store with v5Stores
-      const dayV5StoreList = v5Stores[selectedDateStr];
-      const matchV5 = dayV5StoreList?.find(
-        (s) =>
-          s.code === store.code ||
-          (s.code === 'CYH' && store.code === 'CMH') ||
-          (s.code === 'CMH' && store.code === 'CYH') ||
-          (s.code === 'ATN' && store.code === 'RTN') ||
-          (s.code === 'RTN' && store.code === 'ATN') ||
-          (s.code === 'POK' && store.code === 'PDK') ||
-          (s.code === 'PDK' && store.code === 'POK')
-      );
+      // Average CPU price for store brand
+      const storePrices = storeItems.map((it) => v5Prices[it.code] || it.cpu || 0).filter((p) => p > 0);
+      const avgPrice = storePrices.length > 0 ? storePrices.reduce((a, b) => a + b, 0) / storePrices.length : 2.5;
 
-      // 1. Daily Calculation (Selected Date)
-      let dailyUnits = matchV5?.dailyAmount || 0;
+      // 1. DAILY CALCULATION (Selected Date)
+      const dailyUnits = getStoreUnitsOnDate(store.code, selectedDateStr);
       let dailyAmount = 0;
       let dailyItemsList: { item: StockItem; qty: number; value: number }[] = [];
 
-      // Check manual dispatches
-      const dayDispatches = storeDispatches[selectedDateStr]?.[store.code];
-      if (dayDispatches && Object.keys(dayDispatches).length > 0) {
-        Object.entries(dayDispatches).forEach(([itemId, qty]) => {
-          const item = allItems.find((i) => i.id === itemId);
-          if (item) {
-            const price = v5Prices[item.code] || 0;
-            const val = qty * price;
-            dailyUnits += qty;
-            dailyAmount += val;
-            dailyItemsList.push({ item, qty, value: val });
+      // Check manual item-specific dispatches
+      const dayDispatches = storeDispatches[selectedDateStr];
+      if (dayDispatches) {
+        for (const [stKey, itemMap] of Object.entries(dayDispatches)) {
+          if (isStoreMatch(stKey, store.code)) {
+            Object.entries(itemMap).forEach(([itemId, qty]) => {
+              const item = allItems.find((i) => i.id === itemId || i.code === itemId);
+              if (item) {
+                const price = v5Prices[item.code] || item.cpu || avgPrice;
+                const val = (Number(qty) || 0) * price;
+                dailyAmount += val;
+                dailyItemsList.push({ item, qty: Number(qty) || 0, value: val });
+              }
+            });
           }
-        });
+        }
       }
 
-      // Check prices for daily amount calculation
-      const storePrices = storeItems.map(it => v5Prices[it.code] || 0).filter(p => p > 0);
-      const avgPrice = storePrices.length > 0 ? storePrices.reduce((a, b) => a + b, 0) / storePrices.length : 0;
       if (dailyAmount === 0 && dailyUnits > 0 && avgPrice > 0) {
         dailyAmount = dailyUnits * avgPrice;
       }
 
-      // 2. Monthly Calculation (Selected Month)
-      let monthlyUnits = matchV5?.monthlyAmount || 0;
-      let monthlyAmount = 0;
+      // 2. MONTHLY CALCULATION (Selected Month)
+      let monthlyUnitsFromDays = 0;
+      monthDates.forEach((dStr) => {
+        monthlyUnitsFromDays += getStoreUnitsOnDate(store.code, dStr);
+      });
 
-      // Scan all stored v5 dates for that month if not manually keyed in
-      if (!monthlyUnits) {
-        Object.entries(v5Stores).forEach(([dStr, sList]) => {
-          if (dStr.startsWith(monthPrefix)) {
-            const st = sList.find(
-              (s) =>
-                s.code === store.code ||
-                (s.code === 'CYH' && store.code === 'CMH') ||
-                (s.code === 'CMH' && store.code === 'CYH') ||
-                (s.code === 'ATN' && store.code === 'RTN') ||
-                (s.code === 'RTN' && store.code === 'ATN') ||
-                (s.code === 'POK' && store.code === 'PDK') ||
-                (s.code === 'PDK' && store.code === 'POK')
-            );
-            if (st) monthlyUnits += (st.dailyAmount || 0);
-          }
-        });
-      }
+      // Match v5 baseline monthly
+      const dayV5StoreList = v5Stores[selectedDateStr];
+      const matchV5 = dayV5StoreList?.find((s) => isStoreMatch(s.code || s.id, store.code));
+      const monthlyUnits = Math.max(monthlyUnitsFromDays, matchV5?.monthlyAmount || 0);
+      const monthlyAmount = monthlyUnits * avgPrice;
 
-      if (monthlyUnits > 0 && avgPrice > 0) {
-        monthlyAmount = monthlyUnits * avgPrice;
-      }
+      // 3. YEARLY CALCULATION (Selected Year)
+      let yearlyUnitsFromDays = 0;
+      yearDates.forEach((dStr) => {
+        yearlyUnitsFromDays += getStoreUnitsOnDate(store.code, dStr);
+      });
+      const yearlyUnits = Math.max(yearlyUnitsFromDays, matchV5?.yearlyAmount || 0);
+      const yearlyAmount = yearlyUnits * avgPrice;
 
-      // 3. Yearly Calculation (Selected Year)
-      let yearlyUnits = matchV5?.yearlyAmount || 0;
-      let yearlyAmount = 0;
-
-      // Scan all stored v5 dates for that year if not manually keyed in
-      if (!yearlyUnits) {
-        Object.entries(v5Stores).forEach(([dStr, sList]) => {
-          if (dStr.startsWith(yearPrefix)) {
-            const st = sList.find(
-              (s) =>
-                s.code === store.code ||
-                (s.code === 'CYH' && store.code === 'CMH') ||
-                (s.code === 'CMH' && store.code === 'CYH') ||
-                (s.code === 'ATN' && store.code === 'RTN') ||
-                (s.code === 'RTN' && store.code === 'ATN') ||
-                (s.code === 'POK' && store.code === 'PDK') ||
-                (s.code === 'PDK' && store.code === 'POK')
-            );
-            if (st) yearlyUnits += (st.dailyAmount || 0);
-          }
-        });
-      }
-
-      if (yearlyUnits > 0 && avgPrice > 0) {
-        yearlyAmount = yearlyUnits * avgPrice;
-      }
-
-      // Total Inventory Valuation allocated to this store (0 by default)
+      // Total Inventory Valuation allocated to this store
       let storeTotalStockValue = 0;
       const dayStock = v5Stock[selectedDateStr];
       if (dayStock) {
         dayStock.forEach((i) => {
           if (i.brand === (store.brand === 'TUBE_COFFEE' ? 'Tube Coffee' : 'OnMart')) {
-            const bal = i.opening_stock + i.stock_in - i.stock_out;
-            if (bal > 0 && i.cpu > 0) {
+            const bal = (i.opening_stock || 0) + (i.stock_in || 0) - (i.stock_out || 0);
+            if (bal > 0 && (i.cpu || 0) > 0) {
               storeTotalStockValue += (bal * i.cpu) * (1 / (store.brand === 'TUBE_COFFEE' ? 9 : 4));
             }
           }
@@ -403,7 +502,19 @@ export default function SummaryPage() {
         storeTotalStockValue,
       };
     });
-  }, [allItems, storeDispatches, v5Stores, v5Stock, v5Prices, selectedDateStr, selectedYear, selectedMonth]);
+  }, [
+    allItems,
+    storeDispatches,
+    v5Stores,
+    v5Stock,
+    v5Prices,
+    selectedDateStr,
+    selectedYear,
+    selectedMonth,
+    allRecordedDates,
+    dailyStoreDistributions,
+    historyDistribution,
+  ]);
 
   // Overall Totals
   const overallTotals = useMemo(() => {
@@ -430,13 +541,74 @@ export default function SummaryPage() {
     );
   }, [storeAnalytics]);
 
+  // Dedicated Brand Breakdown for Daily, Monthly, and Yearly Tracker Items Total
+  const brandTotals = useMemo(() => {
+    let tubeDaily = 0, tubeMonthly = 0, tubeYearly = 0, tubeDailyAmt = 0, tubeMonthlyAmt = 0, tubeYearlyAmt = 0;
+    let onmartDaily = 0, onmartMonthly = 0, onmartYearly = 0, onmartDailyAmt = 0, onmartMonthlyAmt = 0, onmartYearlyAmt = 0;
+
+    storeAnalytics.forEach((s) => {
+      if (s.brand === 'TUBE_COFFEE') {
+        tubeDaily += s.dailyUnits;
+        tubeMonthly += s.monthlyUnits;
+        tubeYearly += s.yearlyUnits;
+        tubeDailyAmt += s.dailyAmount;
+        tubeMonthlyAmt += s.monthlyAmount;
+        tubeYearlyAmt += s.yearlyAmount;
+      } else {
+        onmartDaily += s.dailyUnits;
+        onmartMonthly += s.monthlyUnits;
+        onmartYearly += s.yearlyUnits;
+        onmartDailyAmt += s.dailyAmount;
+        onmartMonthlyAmt += s.monthlyAmount;
+        onmartYearlyAmt += s.yearlyAmount;
+      }
+    });
+
+    const totalDaily = tubeDaily + onmartDaily;
+    const totalMonthly = tubeMonthly + onmartMonthly;
+    const totalYearly = tubeYearly + onmartYearly;
+
+    return {
+      tube: {
+        dailyItems: tubeDaily,
+        monthlyItems: tubeMonthly,
+        yearlyItems: tubeYearly,
+        dailyAmount: tubeDailyAmt,
+        monthlyAmount: tubeMonthlyAmt,
+        yearlyAmount: tubeYearlyAmt,
+        dailyPct: totalDaily > 0 ? ((tubeDaily / totalDaily) * 100).toFixed(1) : '0',
+        monthlyPct: totalMonthly > 0 ? ((tubeMonthly / totalMonthly) * 100).toFixed(1) : '0',
+        yearlyPct: totalYearly > 0 ? ((tubeYearly / totalYearly) * 100).toFixed(1) : '0',
+      },
+      onmart: {
+        dailyItems: onmartDaily,
+        monthlyItems: onmartMonthly,
+        yearlyItems: onmartYearly,
+        dailyAmount: onmartDailyAmt,
+        monthlyAmount: onmartMonthlyAmt,
+        yearlyAmount: onmartYearlyAmt,
+        dailyPct: totalDaily > 0 ? ((onmartDaily / totalDaily) * 100).toFixed(1) : '0',
+        monthlyPct: totalMonthly > 0 ? ((onmartMonthly / totalMonthly) * 100).toFixed(1) : '0',
+        yearlyPct: totalYearly > 0 ? ((onmartYearly / totalYearly) * 100).toFixed(1) : '0',
+      },
+      total: {
+        dailyItems: totalDaily,
+        monthlyItems: totalMonthly,
+        yearlyItems: totalYearly,
+        dailyAmount: tubeDailyAmt + onmartDailyAmt,
+        monthlyAmount: tubeMonthlyAmt + onmartMonthlyAmt,
+        yearlyAmount: tubeYearlyAmt + onmartYearlyAmt,
+      },
+    };
+  }, [storeAnalytics]);
+
   // Find Top Receiving Store
   const topStoreDaily = useMemo(() => {
-    return [...storeAnalytics].sort((a, b) => b.dailyAmount - a.dailyAmount)[0];
+    return [...storeAnalytics].sort((a, b) => b.dailyUnits - a.dailyUnits)[0];
   }, [storeAnalytics]);
 
   const topStoreMonthly = useMemo(() => {
-    return [...storeAnalytics].sort((a, b) => b.monthlyAmount - a.monthlyAmount)[0];
+    return [...storeAnalytics].sort((a, b) => b.monthlyUnits - a.monthlyUnits)[0];
   }, [storeAnalytics]);
 
   return (
@@ -484,7 +656,7 @@ export default function SummaryPage() {
               <button
                 onClick={() => fetchFromCloud()}
                 disabled={syncStatus === 'syncing'}
-                className="ml-1 flex items-center gap-1 px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-xs font-bold transition-all shadow-xs active:scale-95 disabled:opacity-50"
+                className="ml-1 flex items-center gap-1 px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-xs font-bold transition-all shadow-xs active:scale-95 disabled:opacity-50 cursor-pointer"
                 title="ទាញទិន្នន័យចុងក្រោយពី Cloud (Pull from Cloud)"
               >
                 <RefreshCw className={`w-3 h-3 ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
@@ -497,13 +669,13 @@ export default function SummaryPage() {
         {/* Filters: Brand, Year, Month, Day */}
         <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
           {/* Brand Switcher */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 font-bold">
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 font-bold flex-wrap">
             <button
               onClick={() => {
                 setSelectedBrand('ALL');
                 setSelectedStoreCode('ALL');
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 selectedBrand === 'ALL'
                   ? 'bg-white text-slate-900 shadow-xs'
                   : 'text-slate-600 hover:text-slate-900'
@@ -517,7 +689,7 @@ export default function SummaryPage() {
                 setSelectedBrand('TUBE_COFFEE');
                 setSelectedStoreCode('ALL');
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 selectedBrand === 'TUBE_COFFEE'
                   ? 'bg-white text-amber-900 shadow-xs'
                   : 'text-slate-600 hover:text-amber-800'
@@ -531,7 +703,7 @@ export default function SummaryPage() {
                 setSelectedBrand('ONMART');
                 setSelectedStoreCode('ALL');
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                 selectedBrand === 'ONMART'
                   ? 'bg-white text-emerald-900 shadow-xs'
                   : 'text-slate-600 hover:text-emerald-800'
@@ -551,7 +723,7 @@ export default function SummaryPage() {
                 <button
                   key={yr}
                   onClick={() => setSelectedYear(yr)}
-                  className={`px-2.5 py-1 rounded-lg font-black transition-all ${
+                  className={`px-2.5 py-1 rounded-lg font-black transition-all cursor-pointer ${
                     selectedYear === yr
                       ? 'bg-slate-900 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900'
@@ -568,7 +740,7 @@ export default function SummaryPage() {
               <select
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(Number(e.target.value))}
-                className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none"
+                className="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
               >
                 {MONTHS.map((m) => (
                   <option key={m.num} value={m.num}>
@@ -584,7 +756,7 @@ export default function SummaryPage() {
               <select
                 value={selectedDay}
                 onChange={(e) => setSelectedDay(Number(e.target.value))}
-                className="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none"
+                className="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-bold text-slate-800 focus:outline-none cursor-pointer"
               >
                 {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
                   <option key={d} value={d}>
@@ -595,51 +767,328 @@ export default function SummaryPage() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Dashboard View Mode Selector Tabs */}
-        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 text-xs font-bold">
+      {/* ========================================================================= */}
+      {/* 🎯 EXECUTIVE TRACKER ITEMS TOTAL (DAILY • MONTHLY • YEARLY) BANNER & CARDS */}
+      {/* ========================================================================= */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-5 sm:p-6 text-white shadow-xl border border-indigo-800/40 relative overflow-hidden">
+        {/* Ambient lighting glow */}
+        <div className="absolute -right-20 -top-20 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        {/* Tracker Banner Header */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-5 border-b border-white/10 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shadow-inner">
+              <TrendingUp className="w-6 h-6 text-indigo-400" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base sm:text-lg font-black tracking-tight text-white flex items-center gap-2">
+                  <span>🎯 TRACKER ITEMS TOTAL • ផ្ទាំងតាមដានចំនួនទំនិញសរុប</span>
+                </h3>
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  Live Sync Realtime
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 font-medium mt-0.5">
+                ប្រព័ន្ធតាមដានចំនួនទំនិញសរុប (Items Total) ចែកចាយទៅកាន់សាខាទាំង ១៣ (Tube Coffee 9 ហាង + OnMart 4 ហាង) ប្រចាំថ្ងៃ ខែ ឆ្នាំ
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs">
+            <span className="bg-white/10 px-3 py-1.5 rounded-xl border border-white/10 text-slate-200 font-bold">
+              កាលបរិច្ឆេទជ្រើសរើស៖ <span className="font-mono text-amber-300">{selectedDateStr}</span>
+            </span>
+          </div>
+        </div>
+
+        {/* 3 Prominent Tracker Metric Cards: Daily, Monthly, Yearly */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5 relative z-10">
+          {/* 1. DAILY ITEMS TOTAL TRACKER */}
+          <div className="bg-white/5 hover:bg-white/10 transition-all rounded-2xl p-4.5 border border-emerald-500/30 backdrop-blur-xs relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                <span>1. DAILY ITEMS TOTAL (ថ្ងៃនេះ)</span>
+              </span>
+              <span className="text-[11px] font-mono text-slate-300">ថ្ងៃទី {selectedDay}</span>
+            </div>
+
+            <div className="mt-3.5">
+              <div className="text-3xl sm:text-4xl font-black text-emerald-400 font-mono tracking-tight flex items-baseline gap-2">
+                <span>{brandTotals.total.dailyItems.toLocaleString()}</span>
+                <span className="text-xs font-bold text-emerald-200/80 uppercase">Items Total</span>
+              </div>
+              <div className="text-xs text-slate-300 mt-1 flex items-center justify-between">
+                <span>សរុបតម្លៃទឹកប្រាក់ថ្ងៃនេះ៖</span>
+                <span className="font-mono font-bold text-white">
+                  ${brandTotals.total.dailyAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Brand Breakdown Pills */}
+            <div className="mt-3.5 pt-3 border-t border-white/10 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-amber-300 font-bold">
+                  <Coffee className="w-3.5 h-3.5" />
+                  <span>Tube Coffee (9 ហាង)៖</span>
+                </span>
+                <span className="font-mono font-black text-white">
+                  {brandTotals.tube.dailyItems.toLocaleString()} items{' '}
+                  <span className="text-[10px] text-amber-400 font-normal">({brandTotals.tube.dailyPct}%)</span>
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-blue-300 font-bold">
+                  <Store className="w-3.5 h-3.5" />
+                  <span>OnMart (4 ហាង)៖</span>
+                </span>
+                <span className="font-mono font-black text-white">
+                  {brandTotals.onmart.dailyItems.toLocaleString()} items{' '}
+                  <span className="text-[10px] text-blue-400 font-normal">({brandTotals.onmart.dailyPct}%)</span>
+                </span>
+              </div>
+
+              {/* Progress visual bar */}
+              <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden flex mt-2">
+                <div
+                  className="bg-amber-400 h-full transition-all duration-500"
+                  style={{ width: `${brandTotals.tube.dailyPct}%` }}
+                  title={`Tube Coffee: ${brandTotals.tube.dailyPct}%`}
+                />
+                <div
+                  className="bg-blue-400 h-full transition-all duration-500"
+                  style={{ width: `${brandTotals.onmart.dailyPct}%` }}
+                  title={`OnMart: ${brandTotals.onmart.dailyPct}%`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 2. MONTHLY ITEMS TOTAL TRACKER */}
+          <div className="bg-white/5 hover:bg-white/10 transition-all rounded-2xl p-4.5 border border-indigo-500/30 backdrop-blur-xs relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                <BarChart3 className="w-3.5 h-3.5 text-indigo-400" />
+                <span>2. MONTHLY ITEMS TOTAL (ខែនេះ)</span>
+              </span>
+              <span className="text-[11px] font-mono text-slate-300">
+                {MONTHS[selectedMonth - 1].nameEn} {selectedYear}
+              </span>
+            </div>
+
+            <div className="mt-3.5">
+              <div className="text-3xl sm:text-4xl font-black text-indigo-300 font-mono tracking-tight flex items-baseline gap-2">
+                <span>{brandTotals.total.monthlyItems.toLocaleString()}</span>
+                <span className="text-xs font-bold text-indigo-200/80 uppercase">Items Total</span>
+              </div>
+              <div className="text-xs text-slate-300 mt-1 flex items-center justify-between">
+                <span>សរុបតម្លៃទឹកប្រាក់ខែនេះ៖</span>
+                <span className="font-mono font-bold text-white">
+                  ${brandTotals.total.monthlyAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Brand Breakdown Pills */}
+            <div className="mt-3.5 pt-3 border-t border-white/10 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-amber-300 font-bold">
+                  <Coffee className="w-3.5 h-3.5" />
+                  <span>Tube Coffee (9 ហាង)៖</span>
+                </span>
+                <span className="font-mono font-black text-white">
+                  {brandTotals.tube.monthlyItems.toLocaleString()} items{' '}
+                  <span className="text-[10px] text-amber-400 font-normal">({brandTotals.tube.monthlyPct}%)</span>
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-blue-300 font-bold">
+                  <Store className="w-3.5 h-3.5" />
+                  <span>OnMart (4 ហាង)៖</span>
+                </span>
+                <span className="font-mono font-black text-white">
+                  {brandTotals.onmart.monthlyItems.toLocaleString()} items{' '}
+                  <span className="text-[10px] text-blue-400 font-normal">({brandTotals.onmart.monthlyPct}%)</span>
+                </span>
+              </div>
+
+              {/* Progress visual bar */}
+              <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden flex mt-2">
+                <div
+                  className="bg-amber-400 h-full transition-all duration-500"
+                  style={{ width: `${brandTotals.tube.monthlyPct}%` }}
+                  title={`Tube Coffee: ${brandTotals.tube.monthlyPct}%`}
+                />
+                <div
+                  className="bg-blue-400 h-full transition-all duration-500"
+                  style={{ width: `${brandTotals.onmart.monthlyPct}%` }}
+                  title={`OnMart: ${brandTotals.onmart.monthlyPct}%`}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 3. YEARLY ITEMS TOTAL TRACKER */}
+          <div className="bg-white/5 hover:bg-white/10 transition-all rounded-2xl p-4.5 border border-amber-500/30 backdrop-blur-xs relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
+                <span>3. YEARLY ITEMS TOTAL (ឆ្នាំនេះ)</span>
+              </span>
+              <span className="text-[11px] font-mono text-slate-300">ឆ្នាំ {selectedYear}</span>
+            </div>
+
+            <div className="mt-3.5">
+              <div className="text-3xl sm:text-4xl font-black text-amber-300 font-mono tracking-tight flex items-baseline gap-2">
+                <span>{brandTotals.total.yearlyItems.toLocaleString()}</span>
+                <span className="text-xs font-bold text-amber-200/80 uppercase">Items Total</span>
+              </div>
+              <div className="text-xs text-slate-300 mt-1 flex items-center justify-between">
+                <span>សរុបតម្លៃទឹកប្រាក់ឆ្នាំនេះ៖</span>
+                <span className="font-mono font-bold text-white">
+                  ${brandTotals.total.yearlyAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            </div>
+
+            {/* Brand Breakdown Pills */}
+            <div className="mt-3.5 pt-3 border-t border-white/10 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-amber-300 font-bold">
+                  <Coffee className="w-3.5 h-3.5" />
+                  <span>Tube Coffee (9 ហាង)៖</span>
+                </span>
+                <span className="font-mono font-black text-white">
+                  {brandTotals.tube.yearlyItems.toLocaleString()} items{' '}
+                  <span className="text-[10px] text-amber-400 font-normal">({brandTotals.tube.yearlyPct}%)</span>
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-blue-300 font-bold">
+                  <Store className="w-3.5 h-3.5" />
+                  <span>OnMart (4 ហាង)៖</span>
+                </span>
+                <span className="font-mono font-black text-white">
+                  {brandTotals.onmart.yearlyItems.toLocaleString()} items{' '}
+                  <span className="text-[10px] text-blue-400 font-normal">({brandTotals.onmart.yearlyPct}%)</span>
+                </span>
+              </div>
+
+              {/* Progress visual bar */}
+              <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden flex mt-2">
+                <div
+                  className="bg-amber-400 h-full transition-all duration-500"
+                  style={{ width: `${brandTotals.tube.yearlyPct}%` }}
+                  title={`Tube Coffee: ${brandTotals.tube.yearlyPct}%`}
+                />
+                <div
+                  className="bg-blue-400 h-full transition-all duration-500"
+                  style={{ width: `${brandTotals.onmart.yearlyPct}%` }}
+                  title={`OnMart: ${brandTotals.onmart.yearlyPct}%`}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Highlights Summary Bar */}
+        <div className="mt-4 pt-3.5 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
+          <div className="flex items-center gap-4 flex-wrap">
+            <span className="flex items-center gap-1.5">
+              <Award className="w-4 h-4 text-amber-400" />
+              <span>
+                ហាងទទួលច្រើនជាងគេប្រចាំថ្ងៃ៖{' '}
+                <strong className="text-white">
+                  {topStoreDaily && topStoreDaily.dailyUnits > 0 ? `${topStoreDaily.name} (${topStoreDaily.dailyUnits} Items)` : 'គ្មានទិន្នន័យ'}
+                </strong>
+              </span>
+            </span>
+            <span className="text-white/20 hidden sm:inline">•</span>
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="w-4 h-4 text-indigo-400" />
+              <span>
+                ហាងទទួលច្រើនជាងគេប្រចាំខែ៖{' '}
+                <strong className="text-white">
+                  {topStoreMonthly && topStoreMonthly.monthlyUnits > 0 ? `${topStoreMonthly.name} (${topStoreMonthly.monthlyUnits} Items)` : 'គ្មានទិន្នន័យ'}
+                </strong>
+              </span>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="bg-emerald-500/20 text-emerald-300 px-2.5 py-1 rounded-lg font-bold border border-emerald-500/30">
+              13 សាខាសកម្ម
+            </span>
+            <span className="bg-indigo-500/20 text-indigo-300 px-2.5 py-1 rounded-lg font-bold border border-indigo-500/30">
+              105 ទំនិញក្នុងស្តុក
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Dashboard View Mode Selector Tabs */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 gap-1 text-xs font-bold flex-wrap">
+            <button
+              onClick={() => setActiveTab('TRACKER')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all cursor-pointer ${
+                activeTab === 'TRACKER'
+                  ? 'bg-slate-900 text-white shadow-xs font-black ring-2 ring-slate-900/20'
+                  : 'text-slate-700 hover:text-slate-900 bg-white/60'
+              }`}
+            >
+              <TrendingUp className="w-4 h-4 text-amber-400" />
+              <span>🎯 Items Total Tracker (Daily • Monthly • Yearly)</span>
+            </button>
+
             <button
               onClick={() => setActiveTab('DAILY')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'DAILY'
                   ? 'bg-emerald-600 text-white shadow-xs font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <Calendar className="w-3.5 h-3.5" />
-              <span>1. Daily Store Amount (ប្រចាំថ្ងៃ: {selectedDay})</span>
+              <span>1. Daily Store Details (ថ្ងៃ {selectedDay})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('MONTHLY')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'MONTHLY'
                   ? 'bg-indigo-600 text-white shadow-xs font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <BarChart3 className="w-3.5 h-3.5" />
-              <span>2. Monthly Store Amount (ប្រចាំខែ: {MONTHS[selectedMonth - 1].nameEn})</span>
+              <span>2. Monthly Store Details ({MONTHS[selectedMonth - 1].nameEn})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('YEARLY')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'YEARLY'
                   ? 'bg-amber-600 text-white shadow-xs font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               <TrendingUp className="w-3.5 h-3.5" />
-              <span>3. Yearly Store Amount (ប្រចាំឆ្នាំ: {selectedYear})</span>
+              <span>3. Yearly Store Details ({selectedYear})</span>
             </button>
 
             <button
               onClick={() => setActiveTab('ALL_MATRIX')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all cursor-pointer ${
                 activeTab === 'ALL_MATRIX'
-                  ? 'bg-slate-900 text-white shadow-xs font-black'
+                  ? 'bg-purple-700 text-white shadow-xs font-black'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
@@ -649,102 +1098,235 @@ export default function SummaryPage() {
           </div>
 
           {/* Quick Search */}
-          <div className="relative min-w-[200px]">
+          <div className="relative min-w-[220px]">
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Filter store code..."
+              placeholder="ស្វែងរកកូដ ឬឈ្មោះហាង..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
           </div>
         </div>
       </div>
 
-      {/* 4 Executive KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Daily Total Delivered */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2 text-xs font-semibold uppercase tracking-wider">
-            <span>Daily Items to Stores</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
-              <Truck className="w-4 h-4" />
+      {/* ========================================================================= */}
+      {/* TAB 0: 🎯 DEDICATED ITEMS TOTAL TRACKER MATRIX (DAILY • MONTHLY • YEARLY) */}
+      {/* ========================================================================= */}
+      {activeTab === 'TRACKER' && (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden space-y-0">
+          <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/80">
+            <div>
+              <h3 className="text-sm font-black text-slate-900 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-amber-600" />
+                <span>តារាងតាមដានចំនួនទំនិញសរុបគ្រប់សាខា (Items Total Tracker: Daily • Monthly • Yearly)</span>
+                <span className="text-xs font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300">
+                  {filteredStores.length} Stores
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                ប្រៀបធៀបចំនួន Items សរុបជាក់ស្តែងដែលបានចែកចាយទៅកាន់សាខាទាំង ១៣ តាមថ្ងៃ ខែ ឆ្នាំ និងភាគរយចែកចាយ
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 text-xs">
+              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
+                Daily: {overallTotals.dailyUnits} Items
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 font-bold border border-indigo-200">
+                Monthly: {overallTotals.monthlyUnits} Items
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 font-bold border border-amber-200">
+                Yearly: {overallTotals.yearlyUnits} Items
+              </span>
             </div>
           </div>
-          <div className="text-2xl font-black text-emerald-700">
-            {overallTotals.dailyUnits.toLocaleString()}{' '}
-            <span className="text-xs font-normal text-slate-500">items delivered</span>
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500 flex justify-between pt-2 border-t border-slate-100 font-bold">
-            <span>Total Value Today:</span>
-            <span className="text-slate-900 font-mono font-black">
-              ${overallTotals.dailyAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </span>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-slate-900 text-white font-semibold sticky top-0 z-10">
+                <tr className="divide-x divide-slate-800">
+                  <th className="py-3 px-3 w-16 text-center">កូដ</th>
+                  <th className="py-3 px-3 min-w-[180px]">ឈ្មោះសាខា (Store Name)</th>
+                  <th className="py-3 px-2 text-center w-28">Brand</th>
+                  <th className="py-3 px-2 text-center w-28 bg-slate-800 text-slate-300">
+                    Items Catalog
+                  </th>
+                  <th className="py-3 px-3 text-right w-44 bg-emerald-950/80 text-emerald-200">
+                    <div className="flex items-center justify-end gap-1">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>1. Daily Items (ថ្ងៃទី {selectedDay})</span>
+                    </div>
+                    <div className="text-[10px] font-normal text-emerald-300/70">Items Total • Amount ($)</div>
+                  </th>
+                  <th className="py-3 px-3 text-right w-44 bg-indigo-950/80 text-indigo-200">
+                    <div className="flex items-center justify-end gap-1">
+                      <BarChart3 className="w-3.5 h-3.5" />
+                      <span>2. Monthly Items (ខែ {selectedMonth})</span>
+                    </div>
+                    <div className="text-[10px] font-normal text-indigo-300/70">Items Total • Amount ($)</div>
+                  </th>
+                  <th className="py-3 px-3 text-right w-44 bg-amber-950/80 text-amber-200">
+                    <div className="flex items-center justify-end gap-1">
+                      <TrendingUp className="w-3.5 h-3.5" />
+                      <span>3. Yearly Items ({selectedYear})</span>
+                    </div>
+                    <div className="text-[10px] font-normal text-amber-300/70">Items Total • Amount ($)</div>
+                  </th>
+                  <th className="py-3 px-3 text-center w-24">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {filteredStores.map((st) => {
+                  const data = storeAnalytics.find((s) => s.code === st.code);
+                  const isTube = st.brand === 'TUBE_COFFEE';
+
+                  const dailyShare =
+                    overallTotals.dailyUnits > 0
+                      ? (((data?.dailyUnits || 0) / overallTotals.dailyUnits) * 100).toFixed(1)
+                      : '0';
+                  const monthlyShare =
+                    overallTotals.monthlyUnits > 0
+                      ? (((data?.monthlyUnits || 0) / overallTotals.monthlyUnits) * 100).toFixed(1)
+                      : '0';
+                  const yearlyShare =
+                    overallTotals.yearlyUnits > 0
+                      ? (((data?.yearlyUnits || 0) / overallTotals.yearlyUnits) * 100).toFixed(1)
+                      : '0';
+
+                  return (
+                    <tr
+                      key={st.code}
+                      className="hover:bg-slate-50/90 transition-colors divide-x divide-slate-100"
+                    >
+                      {/* Code */}
+                      <td className="py-3 px-3 text-center">
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded-lg font-mono font-black text-xs ${
+                            isTube
+                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                              : 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                          }`}
+                        >
+                          {st.code}
+                        </span>
+                      </td>
+
+                      {/* Store Name */}
+                      <td className="py-3 px-3">
+                        <div className="font-bold text-slate-900">{st.name}</div>
+                        <div className="text-[10px] text-slate-400">
+                          {isTube ? 'Tube Coffee+ Network' : 'OnMart Supermarket'}
+                        </div>
+                      </td>
+
+                      {/* Brand */}
+                      <td className="py-3 px-2 text-center">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                            isTube
+                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                              : 'bg-blue-50 text-blue-800 border border-blue-200'
+                          }`}
+                        >
+                          {isTube ? 'Tube Coffee+' : 'OnMart'}
+                        </span>
+                      </td>
+
+                      {/* Items Catalog Available */}
+                      <td className="py-3 px-2 text-center bg-slate-50/50">
+                        <span className="font-black text-slate-800 text-xs px-2.5 py-0.5 bg-slate-200 rounded-md">
+                          {st.itemCount} Items
+                        </span>
+                      </td>
+
+                      {/* 1. DAILY ITEMS TRACKER */}
+                      <td className="py-3 px-3 text-right bg-emerald-50/20 font-mono">
+                        <div className="text-sm font-black text-emerald-900">
+                          {data?.dailyUnits || 0}{' '}
+                          <span className="text-[10px] font-normal text-emerald-700">items</span>
+                        </div>
+                        <div className="text-[11px] font-bold text-emerald-700">
+                          ${(data?.dailyAmount || 0).toFixed(2)}
+                        </div>
+                        <div className="text-[9px] text-slate-400 mt-0.5">
+                          {dailyShare}% of day
+                        </div>
+                      </td>
+
+                      {/* 2. MONTHLY ITEMS TRACKER */}
+                      <td className="py-3 px-3 text-right bg-indigo-50/20 font-mono">
+                        <div className="text-sm font-black text-indigo-900">
+                          {data?.monthlyUnits || 0}{' '}
+                          <span className="text-[10px] font-normal text-indigo-700">items</span>
+                        </div>
+                        <div className="text-[11px] font-bold text-indigo-700">
+                          ${(data?.monthlyAmount || 0).toFixed(2)}
+                        </div>
+                        <div className="text-[9px] text-slate-400 mt-0.5">
+                          {monthlyShare}% of month
+                        </div>
+                      </td>
+
+                      {/* 3. YEARLY ITEMS TRACKER */}
+                      <td className="py-3 px-3 text-right bg-amber-50/20 font-mono">
+                        <div className="text-sm font-black text-amber-900">
+                          {data?.yearlyUnits || 0}{' '}
+                          <span className="text-[10px] font-normal text-amber-700">items</span>
+                        </div>
+                        <div className="text-[11px] font-bold text-amber-700">
+                          ${(data?.yearlyAmount || 0).toFixed(2)}
+                        </div>
+                        <div className="text-[9px] text-slate-400 mt-0.5">
+                          {yearlyShare}% of year
+                        </div>
+                      </td>
+
+                      {/* Action */}
+                      <td className="py-3 px-2 text-center">
+                        <button
+                          onClick={() => setActiveDetailStore(st)}
+                          className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300 sticky bottom-0 z-10 shadow-xs">
+                <tr className="divide-x divide-slate-200">
+                  <td colSpan={3} className="py-3 px-3 uppercase tracking-wider text-xs">
+                    សរុបរួម {filteredStores.length} សាខាហាង (GRAND TOTAL)
+                  </td>
+                  <td className="py-3 px-2 text-center text-slate-900 font-black">
+                    105 Items
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono font-black text-emerald-900 bg-emerald-100/50">
+                    <div className="text-sm">{overallTotals.dailyUnits.toLocaleString()} Items</div>
+                    <div className="text-[11px] text-emerald-700 font-bold">${overallTotals.dailyAmount.toFixed(2)}</div>
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono font-black text-indigo-900 bg-indigo-100/50">
+                    <div className="text-sm">{overallTotals.monthlyUnits.toLocaleString()} Items</div>
+                    <div className="text-[11px] text-indigo-700 font-bold">${overallTotals.monthlyAmount.toFixed(2)}</div>
+                  </td>
+                  <td className="py-3 px-3 text-right font-mono font-black text-amber-900 bg-amber-100/50">
+                    <div className="text-sm">{overallTotals.yearlyUnits.toLocaleString()} Items</div>
+                    <div className="text-[11px] text-amber-700 font-bold">${overallTotals.yearlyAmount.toFixed(2)}</div>
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
+      )}
 
-        {/* Monthly Total Delivered */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2 text-xs font-semibold uppercase tracking-wider">
-            <span>Monthly Items to Stores</span>
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center">
-              <BarChart3 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-indigo-700">
-            {overallTotals.monthlyUnits.toLocaleString()}{' '}
-            <span className="text-xs font-normal text-slate-500">items in {MONTHS[selectedMonth - 1].nameEn}</span>
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500 flex justify-between pt-2 border-t border-slate-100 font-bold">
-            <span>Total Month Value:</span>
-            <span className="text-slate-900 font-mono font-black">
-              ${overallTotals.monthlyAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-        </div>
-
-        {/* Yearly Total Delivered */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-500 mb-2 text-xs font-semibold uppercase tracking-wider">
-            <span>Yearly Items to Stores</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-amber-700">
-            {overallTotals.yearlyUnits.toLocaleString()}{' '}
-            <span className="text-xs font-normal text-slate-500">items in {selectedYear}</span>
-          </div>
-          <div className="mt-2 text-[11px] text-slate-500 flex justify-between pt-2 border-t border-slate-100 font-bold">
-            <span>Total Year Value:</span>
-            <span className="text-slate-900 font-mono font-black">
-              ${overallTotals.yearlyAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-        </div>
-
-        {/* Top Store Highlight */}
-        <div className="bg-slate-950 text-white p-4 rounded-2xl border border-slate-800 shadow-2xs">
-          <div className="flex items-center justify-between text-slate-400 mb-2 text-xs font-semibold uppercase tracking-wider">
-            <span>Top Receiving Store</span>
-            <div className="w-8 h-8 rounded-lg bg-white/10 text-amber-400 flex items-center justify-center">
-              <Award className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-xl font-black text-amber-300 truncate">
-            {topStoreMonthly && topStoreMonthly.monthlyUnits > 0 ? topStoreMonthly.name : 'គ្មានទិន្នន័យ'}
-          </div>
-          <div className="mt-2 text-[11px] text-slate-400 flex justify-between pt-2 border-t border-slate-800 font-medium">
-            <span>Monthly Received:</span>
-            <span className="text-emerald-400 font-bold font-mono">
-              ${(topStoreMonthly?.monthlyAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-        </div>
-      </div>
-
+      {/* ========================================================================= */}
       {/* TAB 1: DAILY STORE DISTRIBUTION DASHBOARD */}
+      {/* ========================================================================= */}
       {activeTab === 'DAILY' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -802,7 +1384,7 @@ export default function SummaryPage() {
 
                     <button
                       onClick={() => setActiveDetailStore(st)}
-                      className="opacity-80 group-hover:opacity-100 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold transition-all"
+                      className="opacity-80 group-hover:opacity-100 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
                     >
                       Items
                     </button>
@@ -830,6 +1412,22 @@ export default function SummaryPage() {
                     </div>
                   </div>
 
+                  {/* 3-in-1 Tracker Pills for Daily, Monthly, Yearly */}
+                  <div className="mt-2.5 grid grid-cols-3 gap-1 text-[10px] font-bold text-center">
+                    <div className="bg-emerald-50 text-emerald-800 py-1 px-1 rounded-lg border border-emerald-200">
+                      <span className="block text-[8px] uppercase text-emerald-600 font-medium">Daily</span>
+                      <span>{data?.dailyUnits || 0} items</span>
+                    </div>
+                    <div className="bg-indigo-50 text-indigo-800 py-1 px-1 rounded-lg border border-indigo-200">
+                      <span className="block text-[8px] uppercase text-indigo-600 font-medium">Monthly</span>
+                      <span>{data?.monthlyUnits || 0} items</span>
+                    </div>
+                    <div className="bg-amber-50 text-amber-800 py-1 px-1 rounded-lg border border-amber-200">
+                      <span className="block text-[8px] uppercase text-amber-600 font-medium">Yearly</span>
+                      <span>{data?.yearlyUnits || 0} items</span>
+                    </div>
+                  </div>
+
                   {/* Share of daily output */}
                   <div className="mt-2.5 flex items-center justify-between text-[11px]">
                     <span className="text-slate-500 font-medium">Daily Supply Share:</span>
@@ -848,7 +1446,9 @@ export default function SummaryPage() {
         </div>
       )}
 
+      {/* ========================================================================= */}
       {/* TAB 2: MONTHLY STORE DISTRIBUTION DASHBOARD */}
+      {/* ========================================================================= */}
       {activeTab === 'MONTHLY' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -901,6 +1501,13 @@ export default function SummaryPage() {
                         Monthly Delivery Distribution • {MONTHS[selectedMonth - 1].nameEn} {selectedYear}
                       </span>
                     </div>
+
+                    <button
+                      onClick={() => setActiveDetailStore(st)}
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                    >
+                      Items
+                    </button>
                   </div>
 
                   <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
@@ -924,6 +1531,22 @@ export default function SummaryPage() {
                     </div>
                   </div>
 
+                  {/* 3-in-1 Tracker Pills */}
+                  <div className="mt-2.5 grid grid-cols-3 gap-1 text-[10px] font-bold text-center">
+                    <div className="bg-emerald-50 text-emerald-800 py-1 px-1 rounded-lg border border-emerald-200">
+                      <span className="block text-[8px] uppercase text-emerald-600 font-medium">Daily</span>
+                      <span>{data?.dailyUnits || 0} items</span>
+                    </div>
+                    <div className="bg-indigo-50 text-indigo-800 py-1 px-1 rounded-lg border border-indigo-200">
+                      <span className="block text-[8px] uppercase text-indigo-600 font-medium">Monthly</span>
+                      <span>{data?.monthlyUnits || 0} items</span>
+                    </div>
+                    <div className="bg-amber-50 text-amber-800 py-1 px-1 rounded-lg border border-amber-200">
+                      <span className="block text-[8px] uppercase text-amber-600 font-medium">Yearly</span>
+                      <span>{data?.yearlyUnits || 0} items</span>
+                    </div>
+                  </div>
+
                   <div className="mt-2.5 flex items-center justify-between text-[11px]">
                     <span className="text-slate-500 font-medium">Monthly Kitchen Share:</span>
                     <span className="font-bold text-indigo-700">{sharePct}% of total</span>
@@ -941,7 +1564,9 @@ export default function SummaryPage() {
         </div>
       )}
 
+      {/* ========================================================================= */}
       {/* TAB 3: YEARLY STORE DISTRIBUTION DASHBOARD */}
+      {/* ========================================================================= */}
       {activeTab === 'YEARLY' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -994,6 +1619,13 @@ export default function SummaryPage() {
                         Annual Cumulative Supply • Year {selectedYear}
                       </span>
                     </div>
+
+                    <button
+                      onClick={() => setActiveDetailStore(st)}
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold transition-all cursor-pointer"
+                    >
+                      Items
+                    </button>
                   </div>
 
                   <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
@@ -1017,6 +1649,22 @@ export default function SummaryPage() {
                     </div>
                   </div>
 
+                  {/* 3-in-1 Tracker Pills */}
+                  <div className="mt-2.5 grid grid-cols-3 gap-1 text-[10px] font-bold text-center">
+                    <div className="bg-emerald-50 text-emerald-800 py-1 px-1 rounded-lg border border-emerald-200">
+                      <span className="block text-[8px] uppercase text-emerald-600 font-medium">Daily</span>
+                      <span>{data?.dailyUnits || 0} items</span>
+                    </div>
+                    <div className="bg-indigo-50 text-indigo-800 py-1 px-1 rounded-lg border border-indigo-200">
+                      <span className="block text-[8px] uppercase text-indigo-600 font-medium">Monthly</span>
+                      <span>{data?.monthlyUnits || 0} items</span>
+                    </div>
+                    <div className="bg-amber-50 text-amber-800 py-1 px-1 rounded-lg border border-amber-200">
+                      <span className="block text-[8px] uppercase text-amber-600 font-medium">Yearly</span>
+                      <span>{data?.yearlyUnits || 0} items</span>
+                    </div>
+                  </div>
+
                   <div className="mt-2.5 flex items-center justify-between text-[11px]">
                     <span className="text-slate-500 font-medium">Yearly Allocation Share:</span>
                     <span className="font-bold text-amber-800">{sharePct}% of year</span>
@@ -1034,7 +1682,9 @@ export default function SummaryPage() {
         </div>
       )}
 
+      {/* ========================================================================= */}
       {/* TAB 4: MASTER COMPARISON TABLE */}
+      {/* ========================================================================= */}
       {activeTab === 'ALL_MATRIX' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70">
@@ -1162,7 +1812,7 @@ export default function SummaryPage() {
                       <td className="py-3 px-2 text-center">
                         <button
                           onClick={() => setActiveDetailStore(st)}
-                          className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[10px] font-bold"
+                          className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-[10px] font-bold cursor-pointer"
                         >
                           View
                         </button>
@@ -1201,7 +1851,9 @@ export default function SummaryPage() {
         </div>
       )}
 
+      {/* ========================================================================= */}
       {/* MODAL 1: STORE ITEM SPECIFICATION & DETAIL */}
+      {/* ========================================================================= */}
       {activeDetailStore && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh]">
@@ -1231,7 +1883,7 @@ export default function SummaryPage() {
 
               <button
                 onClick={() => setActiveDetailStore(null)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-500 font-bold flex items-center justify-center"
+                className="w-8 h-8 rounded-lg hover:bg-slate-200 text-slate-500 font-bold flex items-center justify-center cursor-pointer"
               >
                 ✕
               </button>
@@ -1280,7 +1932,7 @@ export default function SummaryPage() {
               </span>
               <button
                 onClick={() => setActiveDetailStore(null)}
-                className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold"
+                className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold cursor-pointer"
               >
                 បិទ (Close)
               </button>
@@ -1289,7 +1941,9 @@ export default function SummaryPage() {
         </div>
       )}
 
+      {/* ========================================================================= */}
       {/* MODAL 2: LOG STORE DELIVERY / DISPATCH */}
+      {/* ========================================================================= */}
       {isDeliveryModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl border border-slate-200 overflow-hidden p-6 max-h-[90vh] overflow-y-auto">
@@ -1310,7 +1964,7 @@ export default function SummaryPage() {
 
               <button
                 onClick={() => setIsDeliveryModalOpen(false)}
-                className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 font-bold"
+                className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 font-bold cursor-pointer"
               >
                 ✕
               </button>
@@ -1334,7 +1988,7 @@ export default function SummaryPage() {
                     setDeliveryStoreCode(e.target.value);
                     setDeliveryItemId('');
                   }}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900 focus:bg-white focus:outline-none"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900 focus:bg-white focus:outline-none cursor-pointer"
                 >
                   <optgroup label="☕ Tube Coffee+ (9 ហាង)">
                     {TUBE_COFFEE_STORES.map((s) => (
@@ -1371,7 +2025,7 @@ export default function SummaryPage() {
                 <select
                   value={deliveryItemId}
                   onChange={(e) => setDeliveryItemId(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-semibold text-slate-900 focus:bg-white focus:outline-none"
+                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 font-semibold text-slate-900 focus:bg-white focus:outline-none cursor-pointer"
                 >
                   <option value="">-- សូមជ្រើសរើសទំនិញ --</option>
                   {allItems
@@ -1420,13 +2074,13 @@ export default function SummaryPage() {
                 <button
                   type="button"
                   onClick={() => setIsDeliveryModalOpen(false)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold cursor-pointer"
                 >
                   បោះបង់ (Cancel)
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-sm"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-sm cursor-pointer"
                 >
                   រក្សាទុកការចែក (Save Delivery)
                 </button>
@@ -1435,6 +2089,7 @@ export default function SummaryPage() {
           </div>
         </div>
       )}
+
       {/* ========================================================================= */}
       {/* REFERENCE GUIDE MODAL (ឯកសារយោង & របៀបប្រើប្រាស់ផ្លូវការ) */}
       {/* ========================================================================= */}
@@ -1459,7 +2114,7 @@ export default function SummaryPage() {
 
               <button
                 onClick={() => setIsReferenceOpen(false)}
-                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all"
+                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition-all cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1533,7 +2188,7 @@ export default function SummaryPage() {
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
               <button
                 onClick={() => setIsReferenceOpen(false)}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all"
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all cursor-pointer"
               >
                 យល់ព្រម (Close)
               </button>
