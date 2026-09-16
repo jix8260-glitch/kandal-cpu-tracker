@@ -969,16 +969,6 @@ export default function CPUMainPage() {
               </span>
             </div>
 
-            {/* Quick QR Access Button */}
-            <button
-              onClick={() => setShowQRModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl text-xs font-bold border border-indigo-200 transition-colors shadow-xs cursor-pointer"
-              title="បង្ហាញ QR Code សម្រាប់បុគ្គលិកស្កេនទូរស័ព្ទលើ Wi-Fi"
-            >
-              <QrCode className="w-3.5 h-3.5 text-indigo-600" />
-              <span className="hidden sm:inline">QR Access</span>
-            </button>
-
             {/* Quick Print Button */}
             <button
               onClick={() => window.print()}
@@ -1043,13 +1033,6 @@ export default function CPUMainPage() {
           </div>
         </div>
 
-        {/* REAL-TIME APPROVAL QUEUE (STAFF QR REQUESTS) */}
-        <div className="print:hidden">
-          <ApprovalQueue
-            currentUserName={currentUserName}
-            onLedgerUpdate={() => fetchFromCloud(false)}
-          />
-        </div>
 
         <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 print:hidden">
           <div className="flex items-center gap-2">
@@ -1939,8 +1922,7 @@ export default function CPUMainPage() {
         </div>
       )}
 
-      {/* QR CODE ACCESS MODAL */}
-      <QRCodeModal isOpen={showQRModal} onClose={() => setShowQRModal(false)} />
+
     </div>
   );
 }

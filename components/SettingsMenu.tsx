@@ -89,22 +89,6 @@ export default function SettingsMenu({
 
           {/* ACTIONS & TOOLS */}
           <div className="py-1.5">
-            {/* 1. QR Access */}
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                onOpenQR?.();
-              }}
-              className="w-full text-left flex items-center gap-2.5 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-indigo-600 transition-colors cursor-pointer"
-            >
-              <div className="w-6 h-6 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                <QrCode className="w-3.5 h-3.5" />
-              </div>
-              <div>
-                <div>QR Access (ស្កេនទូរស័ព្ទ)</div>
-                <div className="text-[10px] text-slate-400 font-normal">Wi-Fi Mobile Staff Request</div>
-              </div>
-            </button>
 
             {/* 2. Admin Settings & Logs */}
             {currentUserRole === 'ADMIN' && (
