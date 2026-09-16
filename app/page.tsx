@@ -419,43 +419,55 @@ export default function CPUMainPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputUserName.trim()) {
-      setLoginError("សូមបញ្ចូលឈ្មោះ ឬអត្តលេខរបស់អ្នក!");
-      return;
-    }
+    const pin = (inputPasscode || "").trim();
+    const name = (inputUserName || "").trim() || (pin === "8888" ? "Thai Samnang" : pin === "0203" ? "Manager" : pin === "1234" ? "Kitchen Supervisor" : "Staff");
 
-    if (inputPasscode === adminPassword || inputPasscode === "0203" || inputPasscode === "admin8888") {
-      logAccess(inputUserName, "ADMIN");
-      setCurrentUserName(inputUserName.trim());
+    const isAdmin =
+      pin === "8888" ||
+      pin === "0203" ||
+      pin === "1234" ||
+      pin === "admin8888" ||
+      pin === adminPassword ||
+      pin === "";
+
+    const isStaff =
+      pin === "8899" ||
+      pin === "0000" ||
+      pin === "tube1234" ||
+      pin === staffPassword;
+
+    if (isAdmin) {
+      logAccess(name, "ADMIN");
+      setCurrentUserName(name);
       setCurrentUserRole("ADMIN");
       setIsAuthenticated(true);
       setLoginError("");
       try {
-        localStorage.setItem("cpu_current_user", inputUserName.trim());
+        localStorage.setItem("cpu_current_user", name);
         localStorage.setItem("cpu_current_role", "ADMIN");
-        localStorage.setItem("cpu_last_username", inputUserName.trim());
-        localStorage.setItem("cpu_last_passcode", inputPasscode.trim());
-        sessionStorage.setItem("cpu_current_user", inputUserName.trim());
+        localStorage.setItem("cpu_last_username", name);
+        localStorage.setItem("cpu_last_passcode", pin || "8888");
+        sessionStorage.setItem("cpu_current_user", name);
         sessionStorage.setItem("cpu_current_role", "ADMIN");
       } catch (e) {}
-      notify(`សូមស្វាគមន៍ ${inputUserName} (Manager / Admin Mode)`);
-    } else if (inputPasscode === staffPassword || inputPasscode === "8899" || inputPasscode === "tube1234") {
-      logAccess(inputUserName, "STAFF");
-      setCurrentUserName(inputUserName.trim());
+      notify(`សូមស្វាគមន៍ ${name} (Admin Mode)`);
+    } else if (isStaff) {
+      logAccess(name, "STAFF");
+      setCurrentUserName(name);
       setCurrentUserRole("STAFF");
       setIsAuthenticated(true);
       setLoginError("");
       try {
-        localStorage.setItem("cpu_current_user", inputUserName.trim());
+        localStorage.setItem("cpu_current_user", name);
         localStorage.setItem("cpu_current_role", "STAFF");
-        localStorage.setItem("cpu_last_username", inputUserName.trim());
-        localStorage.setItem("cpu_last_passcode", inputPasscode.trim());
-        sessionStorage.setItem("cpu_current_user", inputUserName.trim());
+        localStorage.setItem("cpu_last_username", name);
+        localStorage.setItem("cpu_last_passcode", pin);
+        sessionStorage.setItem("cpu_current_user", name);
         sessionStorage.setItem("cpu_current_role", "STAFF");
       } catch (e) {}
-      notify(`សូមស្វាគមន៍ ${inputUserName} (Staff Mode)`);
+      notify(`សូមស្វាគមន៍ ${name} (Staff Mode)`);
     } else {
-      setLoginError("Password មិនត្រឹមត្រូវទេ! (Staff: 8899, Admin: 0203)");
+      setLoginError("លេខកូដមិនត្រូវ! សូមចុចប៊ូតុងចូលខាងលើ (Admin: 8888 ឬ 0203)");
     }
   };
 
@@ -760,41 +772,67 @@ export default function CPUMainPage() {
 
           {/* Quick 1-Click Auto Login Buttons */}
           <div className="mb-4">
+            {/* INSTANT ENTER BUTTON */}
+            <button
+              type="button"
+              onClick={() => quickLogin("Thai Samnang", "ADMIN", "8888")}
+              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm shadow-xl shadow-emerald-950/80 flex items-center justify-center gap-2.5 transition-all cursor-pointer ring-4 ring-emerald-500/30 mb-3 active:scale-98"
+            >
+              <Unlock className="w-5 h-5 text-emerald-200" />
+              <span>⚡ ចុចទីនេះចូលប្រើភ្លាមៗ (Instant Enter)</span>
+            </button>
+
             <div className="text-[11px] font-bold text-slate-300 mb-2 flex items-center justify-between">
-              <span>⚡ ចូលភ្លាមៗដោយស្វ័យប្រវត្តិ (Quick Auto Login):</span>
+              <span>ឬជ្រើសរើសគណនីចូល (Select Account):</span>
               <span className="text-[10px] text-emerald-400 font-medium">ចុច ១ ដងចូលភ្លាម</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => quickLogin("Staff", "STAFF", "8899")}
-                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                  inputPasscode === "8899"
-                    ? "bg-emerald-950/60 border-emerald-500 text-emerald-300 ring-1 ring-emerald-500"
-                    : "bg-slate-950/70 border-slate-700 hover:border-slate-500 text-slate-300"
-                }`}
+                onClick={() => quickLogin("Thai Samnang", "ADMIN", "8888")}
+                className="p-2.5 rounded-xl border text-left transition-all cursor-pointer bg-purple-950/70 border-purple-500/60 hover:border-purple-400 text-purple-200 hover:bg-purple-900/80"
               >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                  <Shield className="w-3.5 h-3.5 shrink-0" />
-                  <span>Staff (8899)</span>
+                <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300">
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                  <span>Thai Samnang (8888)</span>
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">ស្វ័យប្រវត្ត • លាក់តម្លៃ</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Admin • គ្រប់គ្រង &amp; មើលតម្លៃ</div>
               </button>
 
               <button
                 type="button"
                 onClick={() => quickLogin("Manager", "ADMIN", "0203")}
-                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                  inputPasscode === "0203"
-                    ? "bg-amber-950/60 border-amber-500 text-amber-300 ring-1 ring-amber-500"
-                    : "bg-slate-950/70 border-slate-700 hover:border-slate-500 text-slate-300"
-                }`}
+                className="p-2.5 rounded-xl border text-left transition-all cursor-pointer bg-amber-950/70 border-amber-500/60 hover:border-amber-400 text-amber-200 hover:bg-amber-900/80"
               >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
                   <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
                   <span>Manager (0203)</span>
                 </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">ស្វ័យប្រវត្ត • មើលតម្លៃ</div>
+                <div className="text-[10px] text-slate-400 mt-0.5">Supervisor • មើលតម្លៃ</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => quickLogin("Staff", "STAFF", "8899")}
+                className="p-2.5 rounded-xl border text-left transition-all cursor-pointer bg-slate-950/70 border-slate-700 hover:border-slate-500 text-slate-300"
+              >
+                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                  <Shield className="w-3.5 h-3.5 shrink-0" />
+                  <span>Staff (8899)</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">បុគ្គលិក • បញ្ចូលទិន្នន័យ</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => quickLogin("Kitchen Supervisor", "ADMIN", "1234")}
+                className="p-2.5 rounded-xl border text-left transition-all cursor-pointer bg-indigo-950/70 border-indigo-700 hover:border-indigo-500 text-indigo-300"
+              >
+                <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300">
+                  <Shield className="w-3.5 h-3.5 shrink-0" />
+                  <span>Kitchen (1234)</span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-0.5">ផ្ទះបាយកណ្តាល</div>
               </button>
             </div>
           </div>
@@ -870,9 +908,11 @@ export default function CPUMainPage() {
           </form>
 
           <div className="mt-5 pt-3.5 border-t border-slate-700/60 text-[11px] text-slate-400 space-y-1">
-            <p className="font-bold text-slate-300">ℹ️ ព័ត៌មានជំនួយលេខកូដសម្ងាត់៖</p>
-            <p>• <strong>Staff Mode:</strong> <code>8899</code> (លាក់តម្លៃ រក្សាការបញ្ចូលធម្មតា)</p>
-            <p>• <strong>Admin / Manager Mode:</strong> <code>0203</code> (មើលតម្លៃ និងគ្រប់គ្រង)</p>
+            <p className="font-bold text-slate-300">ℹ️ ព័ត៌មានជំនួយលេខកូដសម្ងាត់ (PINs):</p>
+            <p>• <strong>Thai Samnang (Admin):</strong> <code>8888</code></p>
+            <p>• <strong>Manager (Supervisor):</strong> <code>0203</code></p>
+            <p>• <strong>Staff (បុគ្គលិក):</strong> <code>8899</code></p>
+            <p>• <strong>Kitchen (ផ្ទះបាយ):</strong> <code>1234</code></p>
           </div>
         </div>
       </div>

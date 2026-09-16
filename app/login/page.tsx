@@ -33,7 +33,9 @@ interface UserProfile {
 const DEFAULT_PROFILES: UserProfile[] = [
   { id: "u1", name: "Thai Samnang", pin: "8888", role: "ADMIN", title: "Admin / Owner" },
   { id: "u2", name: "CPU Kitchen Lead", pin: "0203", role: "ADMIN", title: "Manager / Supervisor" },
-  { id: "u3", name: "Store Staff", pin: "8899", role: "STAFF", title: "Commissary Staff" }
+  { id: "u3", name: "Store Staff", pin: "8899", role: "STAFF", title: "Commissary Staff" },
+  { id: "u4", name: "Kitchen Supervisor", pin: "1234", role: "ADMIN", title: "Kitchen Supervisor" },
+  { id: "u5", name: "Kitchen Operator", pin: "0000", role: "STAFF", title: "Kitchen Operator" }
 ];
 
 export default function LoginPage() {
@@ -84,9 +86,9 @@ export default function LoginPage() {
     setErrorMessage("");
 
     // Validate PIN
-    const validPins = ["8899", "0203", "8888", "admin8888", "tube1234"];
-    const isMaster = pinToVerify === "0203" || pinToVerify === "8888" || pinToVerify === "admin8888";
-    const isStaff = pinToVerify === "8899" || pinToVerify === "tube1234";
+    const validPins = ["8899", "0203", "8888", "admin8888", "tube1234", "1234", "0000"];
+    const isMaster = pinToVerify === "0203" || pinToVerify === "8888" || pinToVerify === "admin8888" || pinToVerify === "1234";
+    const isStaff = pinToVerify === "8899" || pinToVerify === "tube1234" || pinToVerify === "0000";
 
     setTimeout(() => {
       if (isMaster || isStaff || validPins.includes(pinToVerify)) {
@@ -226,14 +228,24 @@ export default function LoginPage() {
           </div>
         )}
 
+        {/* Instant Enter Button */}
+        <button
+          type="button"
+          onClick={() => executeLogin("Thai Samnang", "ADMIN", "8888")}
+          className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm shadow-xl shadow-emerald-950 flex items-center justify-center gap-2.5 transition-all cursor-pointer ring-4 ring-emerald-500/30 active:scale-98"
+        >
+          <Unlock className="w-5 h-5 text-emerald-200" />
+          <span>⚡ ចុចទីនេះចូលប្រើភ្លាមៗ (Instant Enter)</span>
+        </button>
+
         {/* Quick 1-Click Auto Login Buttons */}
         <div className="space-y-2">
           <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
-            <span>⚡ ចូលភ្លាមៗដោយស្វ័យប្រវត្តិ (1-Click Auto Login) :</span>
-            <span className="text-[10px] text-emerald-400 font-medium">ចុច ១ ដងចូលភ្លាម</span>
+            <span>ជ្រើសរើសគណនី (Select Profile) :</span>
+            <span className="text-[10px] text-emerald-400 font-medium">ចុចលើឈ្មោះដើម្បីចូល</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {DEFAULT_PROFILES.map((prof) => {
               const isSelected = selectedProfileId === prof.id;
               return (

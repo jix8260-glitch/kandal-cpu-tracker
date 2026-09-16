@@ -68,8 +68,10 @@ export interface ItemData {
 // Initial System Defaults
 const INITIAL_USERS: UserProfile[] = [
   { id: "u1", name: "Thai Samnang", pin: "8888", role: "Admin", canViewFinancials: true },
-  { id: "u2", name: "Kitchen Supervisor", pin: "1234", role: "Manager", canViewFinancials: false },
-  { id: "u3", name: "Kitchen Operator", pin: "0000", role: "Staff", canViewFinancials: false }
+  { id: "u2", name: "Manager", pin: "0203", role: "Admin", canViewFinancials: true },
+  { id: "u3", name: "Kitchen Supervisor", pin: "1234", role: "Manager", canViewFinancials: false },
+  { id: "u4", name: "Store Staff", pin: "8899", role: "Staff", canViewFinancials: false },
+  { id: "u5", name: "Kitchen Operator", pin: "0000", role: "Staff", canViewFinancials: false }
 ];
 
 const INITIAL_STORES: StoreData[] = [
