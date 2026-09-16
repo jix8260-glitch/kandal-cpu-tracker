@@ -3,14 +3,17 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Cloud, Calendar, Package, BarChart3, Lock, Settings } from 'lucide-react';
-import { isSupabaseConfigured } from '@/lib/supabase';
+import { Calendar, BarChart3, Printer } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { useAuth } from './AuthLock';
+import SettingsMenu from './SettingsMenu';
 
 export const Navbar: React.FC = () => {
   const pathname = usePathname();
-  const { lockApp, openSettings } = useAuth();
+  const { openSettings } = useAuth();
+
+  // Do not render navbar on standalone login page
+  if (pathname === '/login') return null;
 
   const navLinks = [
     { href: '/', label: 'Daily Stock Tracker', icon: <Calendar className="w-4 h-4" /> },
@@ -19,14 +22,14 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-3 overflow-x-auto whitespace-nowrap">
         {/* Brand with CPU and Kandal Commissary Kitchen */}
-        <Link href="/" className="flex items-center hover:opacity-95 transition-opacity">
+        <Link href="/" className="flex items-center hover:opacity-95 transition-opacity shrink-0">
           <BrandLogo size="md" />
         </Link>
 
-        {/* Navigation Tabs */}
-        <nav className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
+        {/* 2 Navigation Buttons (Daily Stock Tracker & Store Summary) */}
+        <nav className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold shrink-0">
           {navLinks.map((link) => {
             const isActive = pathname === link.href;
             return (
@@ -46,19 +49,30 @@ export const Navbar: React.FC = () => {
           })}
         </nav>
 
-        {/* Right Tools: Cloud Indicator */}
-        <div className="flex items-center gap-2">
-          {/* Cloud Status */}
-          <div
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${
-              isSupabaseConfigured
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                : 'bg-emerald-50 text-emerald-800 border-emerald-300'
-            }`}
+        {/* 2 Buttons Moved Up (Print & Settings & Tools) */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold border border-slate-300 transition-colors cursor-pointer shadow-2xs"
+            title="បោះពុម្ពរបាយការណ៍ (Print Report)"
           >
-            <Cloud className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{isSupabaseConfigured ? 'Supabase Online' : 'Auto-Save Active'}</span>
-          </div>
+            <Printer className="w-3.5 h-3.5 text-slate-600" />
+            <span>Print</span>
+          </button>
+
+          <SettingsMenu
+            onOpenSettings={openSettings}
+            onPrint={() => window.print()}
+            onLogout={() => {
+              try {
+                localStorage.removeItem('cpu_current_user');
+                localStorage.removeItem('cpu_current_role');
+                sessionStorage.removeItem('cpu_current_user');
+                sessionStorage.removeItem('cpu_current_role');
+                window.location.href = '/login';
+              } catch (e) {}
+            }}
+          />
         </div>
       </div>
     </header>
