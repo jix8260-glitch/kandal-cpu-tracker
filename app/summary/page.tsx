@@ -148,6 +148,9 @@ export default function SummaryPage() {
   const [deliveryQty, setDeliveryQty] = useState<number>(0);
   const [deliverySuccessMsg, setDeliverySuccessMsg] = useState<string>('');
 
+  // Dynamic Item Prices from Master Items
+  const [v5Prices, setV5Prices] = useState<Record<string, number>>({});
+
   // All 105 starter items with dynamic CPU from Master Items
   const allItems: StockItem[] = useMemo(() => {
     const starters = getNormalizedStarterItems() as StockItem[];
@@ -174,7 +177,6 @@ export default function SummaryPage() {
   const [v5Stock, setV5Stock] = useState<
     Record<string, Array<{ item_code: string; description_khmer: string; brand: string; cpu: number; opening_stock: number; stock_in: number; stock_out: number }>>
   >({});
-  const [v5Prices, setV5Prices] = useState<Record<string, number>>({});
 
   // cpu_history_distribution (Recorded from Main Dashboard / page.tsx)
   const [historyDistribution, setHistoryDistribution] = useState<Record<string, Record<string, number>>>({});

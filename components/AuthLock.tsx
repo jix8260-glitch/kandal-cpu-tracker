@@ -220,11 +220,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     reader.readAsText(file);
   };
 
-  if (!mounted) {
-    return null;
-  }
-
-  // Render Full Application Content when Unlocked
+  // Render Full Application Content when Unlocked (Locks Removed)
   return (
     <AuthContext.Provider value={{ isUnlocked, lockApp, openSettings }}>
       {children}
