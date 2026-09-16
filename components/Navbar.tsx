@@ -65,13 +65,7 @@ export const Navbar: React.FC = () => {
             onOpenSettings={openSettings}
             onPrint={() => window.print()}
             onLogout={() => {
-              try {
-                localStorage.removeItem('cpu_current_user');
-                localStorage.removeItem('cpu_current_role');
-                sessionStorage.removeItem('cpu_current_user');
-                sessionStorage.removeItem('cpu_current_role');
-                window.location.href = '/login';
-              } catch (e) {}
+              window.location.href = '/';
             }}
           />
         </div>

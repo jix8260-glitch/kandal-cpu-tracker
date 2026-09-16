@@ -57,19 +57,18 @@ export default function LoginPage() {
   const [failedAttempts, setFailedAttempts] = useState<number>(0);
   const [isLocked, setIsLocked] = useState<boolean>(false);
 
-  // Check if already authenticated on mount
+  // All locks removed: automatically establish admin session and redirect to dashboard
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        const savedUser = localStorage.getItem("cpu_current_user") || sessionStorage.getItem("cpu_current_user");
-        const savedRole = localStorage.getItem("cpu_current_role") || sessionStorage.getItem("cpu_current_role");
-        if (savedUser && savedRole) {
-          setActiveSessionUser(savedUser);
-          setActiveSessionRole(savedRole);
-        }
+        localStorage.setItem("cpu_current_user", "Thai Samnang");
+        localStorage.setItem("cpu_current_role", "ADMIN");
+        sessionStorage.setItem("cpu_current_user", "Thai Samnang");
+        sessionStorage.setItem("cpu_current_role", "ADMIN");
       } catch (e) {}
+      router.replace("/");
     }
-  }, []);
+  }, [router]);
 
   const handleSelectProfile = (profile: UserProfile) => {
     setSelectedProfileId(profile.id);

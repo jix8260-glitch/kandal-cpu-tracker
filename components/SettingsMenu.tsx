@@ -139,7 +139,7 @@ export default function SettingsMenu({
                 </div>
                 <div>
                   <div>Kitchen Dashboard</div>
-                  <div className="text-[10px] text-slate-400 font-normal">Safe PIN Terminal &amp; Stores</div>
+                  <div className="text-[10px] text-slate-400 font-normal">Central Production &amp; Stores</div>
                 </div>
               </div>
               <ExternalLink className="w-3 h-3 text-slate-400" />

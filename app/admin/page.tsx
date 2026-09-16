@@ -22,7 +22,7 @@ import {
 import { AuditLogRecord } from '@/lib/local-db';
 
 export default function AdminOwnerPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [passcode, setPasscode] = useState('');
   const [loginError, setLoginError] = useState('');
   const [lockedOutSeconds, setLockedOutSeconds] = useState(0);
@@ -50,35 +50,13 @@ export default function AdminOwnerPage() {
     }
   };
 
+  useEffect(() => {
+    fetchAdminData();
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!passcode) return;
-    setLoading(true);
-    setLoginError('');
-
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: 'admin', passcode }),
-      });
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        if (data.locked) {
-          setLockedOutSeconds(data.remainingSeconds || 900);
-        }
-        setLoginError(data.error || 'លេខកូដមិនត្រឹមត្រូវ');
-      } else {
-        setIsAuthenticated(true);
-        sessionStorage.setItem('secure_admin_session', data.sessionToken);
-        fetchAdminData();
-      }
-    } catch (err: any) {
-      setLoginError(err.message || 'Server error');
-    } finally {
-      setLoading(false);
-    }
+    fetchAdminData();
   };
 
   const handleCreateBackup = async () => {
@@ -99,111 +77,7 @@ export default function AdminOwnerPage() {
     }
   };
 
-  // Lockout countdown timer
-  useEffect(() => {
-    if (lockedOutSeconds <= 0) return;
-    const interval = setInterval(() => {
-      setLockedOutSeconds((prev) => Math.max(0, prev - 1));
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [lockedOutSeconds]);
-
-  // Session timeout auto-lock after 15 min of inactivity
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    let timer = setTimeout(() => {
-      setIsAuthenticated(false);
-      sessionStorage.removeItem('secure_admin_session');
-      alert('⚠️ សម័យប្រជុំ (Session) បានផុតកំណត់ដោយសារគ្មានសកម្មភាពលើសពី ១៥ នាទី។');
-    }, 15 * 60 * 1000);
-
-    const resetTimer = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        setIsAuthenticated(false);
-        sessionStorage.removeItem('secure_admin_session');
-        alert('⚠️ សម័យប្រជុំ (Session) បានផុតកំណត់ដោយសារគ្មានសកម្មភាពលើសពី ១៥ នាទី។');
-      }, 15 * 60 * 1000);
-    };
-
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keydown', resetTimer);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keydown', resetTimer);
-    };
-  }, [isAuthenticated]);
-
-  // --- LOGIN GATE VIEW ---
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 font-sans text-white">
-        <div className="bg-slate-800 rounded-3xl max-w-md w-full p-8 border border-slate-700 shadow-2xl space-y-6">
-          <div className="text-center space-y-2">
-            <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center mx-auto text-indigo-400">
-              <ShieldCheck className="w-8 h-8" />
-            </div>
-            <h1 className="text-lg font-black tracking-wide">Owner / Master Admin Portal</h1>
-            <p className="text-xs text-slate-400">ប្រព័ន្ធគ្រប់គ្រងទិន្នន័យសុវត្ថិភាពខ្ពស់ Local-First</p>
-          </div>
-
-          {lockedOutSeconds > 0 ? (
-            <div className="p-4 bg-rose-950/60 border border-rose-800 rounded-2xl text-rose-300 text-xs space-y-2 text-center">
-              <AlertTriangle className="w-6 h-6 mx-auto text-rose-400 animate-pulse" />
-              <p className="font-bold">គណនីត្រូវបានចាក់សោសុវត្ថិភាព (Brute-Force Lockout)</p>
-              <p className="text-[11px] font-mono">
-                សូមរង់ចាំ៖ {Math.floor(lockedOutSeconds / 60)} នាទី {lockedOutSeconds % 60} វិនាទី
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={handleLogin} className="space-y-4">
-              {loginError && (
-                <div className="p-3 bg-rose-900/40 border border-rose-700 rounded-xl text-xs text-rose-300 font-bold flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
-                  <span>{loginError}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1.5">
-                  Master Password / Owner PIN <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="password"
-                  autoFocus
-                  value={passcode}
-                  onChange={(e) => setPasscode(e.target.value)}
-                  placeholder="វាយបញ្ចូលលេខកូដសម្ងាត់..."
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono text-white focus:outline-none focus:border-indigo-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading || !passcode}
-                className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-50"
-              >
-                {loading ? 'កំពុងផ្ទៀងផ្ទាត់...' : 'Login to Owner Terminal'}
-              </button>
-            </form>
-          )}
-
-          <div className="text-center pt-2">
-            <Link
-              href="/"
-              className="text-xs font-bold text-slate-400 hover:text-slate-200 transition-colors inline-flex items-center gap-1"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>ត្រឡប់ទៅកាន់ Main App</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // --- AUTHENTICATED OWNER DASHBOARD VIEW ---
+  // --- AUTHENTICATED OWNER DASHBOARD VIEW (DIRECT ACCESS) ---
   return (
     <div className="min-h-screen bg-slate-100 font-sans pb-16 text-slate-800">
       {/* Top Navbar */}
@@ -219,19 +93,17 @@ export default function AdminOwnerPage() {
             </Link>
             <div>
               <h2 className="text-sm font-black tracking-wide">Owner Security &amp; Audit Console</h2>
-              <p className="text-[10px] text-slate-400">Local-First Isolated Storage • Inactivity Timeout: 15m</p>
+              <p className="text-[10px] text-slate-400">Direct Access • Central Production Unit</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                setIsAuthenticated(false);
-                sessionStorage.removeItem('secure_admin_session');
-              }}
-              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-rose-300 transition-colors"
+              onClick={fetchAdminData}
+              className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300 transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              Lock Terminal 🔒
+              <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Refresh Logs</span>
             </button>
           </div>
         </div>

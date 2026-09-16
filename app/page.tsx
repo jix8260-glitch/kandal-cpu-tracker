@@ -123,12 +123,12 @@ const buildStarterItems = (): ItemRecord[] => {
 const DEFAULT_ITEMS: ItemRecord[] = buildStarterItems();
 
 export default function CPUMainPage() {
-  // --- AUTHENTICATION STATE ---
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [currentUserRole, setCurrentUserRole] = useState<"ADMIN" | "STAFF">("STAFF");
-  const [currentUserName, setCurrentUserName] = useState("Staff");
-  const [inputPasscode, setInputPasscode] = useState("8899");
-  const [inputUserName, setInputUserName] = useState("Staff");
+  // --- AUTHENTICATION STATE (ALL LOCKS REMOVED) ---
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [currentUserRole, setCurrentUserRole] = useState<"ADMIN" | "STAFF">("ADMIN");
+  const [currentUserName, setCurrentUserName] = useState("Thai Samnang");
+  const [inputPasscode, setInputPasscode] = useState("8888");
+  const [inputUserName, setInputUserName] = useState("Thai Samnang");
   const [showPasscode, setShowPasscode] = useState(false);
   const [loginError, setLoginError] = useState("");
 
@@ -488,15 +488,9 @@ export default function CPUMainPage() {
   };
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
-    setInputPasscode("8899");
-    setInputUserName("Staff");
-    try {
-      localStorage.removeItem("cpu_current_user");
-      localStorage.removeItem("cpu_current_role");
-      sessionStorage.removeItem("cpu_current_user");
-      sessionStorage.removeItem("cpu_current_role");
-    } catch (e) {}
+    setIsAuthenticated(true);
+    setCurrentUserRole("ADMIN");
+    setCurrentUserName("Thai Samnang");
   };
 
   // --- CURRENT DATE DATA ACCESSORS ---
@@ -750,177 +744,7 @@ export default function CPUMainPage() {
   }, [items, currentDayStock]);
 
   // =========================================================================
-  // 3. LOGIN SCREEN VIEW
-  // =========================================================================
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 selection:bg-emerald-500 selection:text-white">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 w-full max-w-md bg-slate-800/90 border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/60 backdrop-blur-md">
-          <div className="flex flex-col items-center text-center mb-5">
-            <div className="h-16 px-6 rounded-2xl bg-black border border-slate-700/80 flex items-center justify-center shadow-inner relative overflow-hidden mb-3">
-              <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500" />
-              <span className="font-mono text-3xl font-black text-white tracking-[0.2em] pl-1">
-                CPU
-              </span>
-            </div>
-            <h1 className="text-lg font-black text-white">Central Production Unit</h1>
-            <p className="text-xs font-bold text-emerald-400">Kandal Commissary Kitchen</p>
-            <p className="text-[11px] text-slate-400 mt-1">Tube Coffee+ (9 Stores) &amp; OnMart (4 Stores) • 105 Items</p>
-          </div>
-
-          {/* Quick 1-Click Auto Login Buttons */}
-          <div className="mb-4">
-            {/* INSTANT ENTER BUTTON */}
-            <button
-              type="button"
-              onClick={() => quickLogin("Thai Samnang", "ADMIN", "8888")}
-              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm shadow-xl shadow-emerald-950/80 flex items-center justify-center gap-2.5 transition-all cursor-pointer ring-4 ring-emerald-500/30 mb-3 active:scale-98"
-            >
-              <Unlock className="w-5 h-5 text-emerald-200" />
-              <span>⚡ ចុចទីនេះចូលប្រើភ្លាមៗ (Instant Enter)</span>
-            </button>
-
-            <div className="text-[11px] font-bold text-slate-300 mb-2 flex items-center justify-between">
-              <span>ឬជ្រើសរើសគណនីចូល (Select Account):</span>
-              <span className="text-[10px] text-emerald-400 font-medium">ចុច ១ ដងចូលភ្លាម</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => quickLogin("Thai Samnang", "ADMIN", "8888")}
-                className="p-2.5 rounded-xl border text-left transition-all cursor-pointer bg-purple-950/70 border-purple-500/60 hover:border-purple-400 text-purple-200 hover:bg-purple-900/80"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300">
-                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                  <span>Thai Samnang (8888)</span>
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Admin • គ្រប់គ្រង &amp; មើលតម្លៃ</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => quickLogin("Manager", "ADMIN", "0203")}
-                className="p-2.5 rounded-xl border text-left transition-all cursor-pointer bg-amber-950/70 border-amber-500/60 hover:border-amber-400 text-amber-200 hover:bg-amber-900/80"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
-                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                  <span>Manager (0203)</span>
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">Supervisor • មើលតម្លៃ</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => quickLogin("Staff", "STAFF", "8899")}
-                className="p-2.5 rounded-xl border text-left transition-all cursor-pointer bg-slate-950/70 border-slate-700 hover:border-slate-500 text-slate-300"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-400">
-                  <Shield className="w-3.5 h-3.5 shrink-0" />
-                  <span>Staff (8899)</span>
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">បុគ្គលិក • បញ្ចូលទិន្នន័យ</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => quickLogin("Kitchen Supervisor", "ADMIN", "1234")}
-                className="p-2.5 rounded-xl border text-left transition-all cursor-pointer bg-indigo-950/70 border-indigo-700 hover:border-indigo-500 text-indigo-300"
-              >
-                <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-300">
-                  <Shield className="w-3.5 h-3.5 shrink-0" />
-                  <span>Kitchen (1234)</span>
-                </div>
-                <div className="text-[10px] text-slate-400 mt-0.5">ផ្ទះបាយកណ្តាល</div>
-              </button>
-            </div>
-          </div>
-
-          <div className="relative flex py-1 items-center mb-3">
-            <div className="flex-grow border-t border-slate-700"></div>
-            <span className="flex-shrink mx-3 text-[10px] text-slate-400 uppercase font-semibold">ឬ បញ្ចូលតាមទម្រង់ខាងក្រោម</span>
-            <div className="flex-grow border-t border-slate-700"></div>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-3.5">
-            <div>
-              <label className="block text-xs font-bold text-slate-300 mb-1">
-                ឈ្មោះ ឬ អត្តលេខអ្នកប្រើប្រាស់ (User Name / ID):
-              </label>
-              <input
-                type="text"
-                value={inputUserName}
-                onChange={(e) => {
-                  setInputUserName(e.target.value);
-                  if (loginError) setLoginError("");
-                }}
-                placeholder="ឧ. បុគ្គលិក A, Manager..."
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-bold text-slate-300">
-                  លេខកូដសម្ងាត់ (Passcode / PIN):
-                </label>
-                <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-                  ✓ បានបំពេញស្វ័យប្រវត្ត {inputPasscode}
-                </span>
-              </div>
-              <div className="relative">
-                <input
-                  type={showPasscode ? "text" : "password"}
-                  value={inputPasscode}
-                  onChange={(e) => {
-                    setInputPasscode(e.target.value);
-                    if (loginError) setLoginError("");
-                  }}
-                  placeholder="PIN (Staff: 8899, Admin: 0203)"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 pr-10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPasscode(!showPasscode)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 cursor-pointer"
-                  title={showPasscode ? "លាក់លេខកូដ" : "បង្ហាញលេខកូដ"}
-                >
-                  {showPasscode ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            {loginError && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>{loginError}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-950 flex items-center justify-center gap-2 transition-all uppercase tracking-wider mt-2 cursor-pointer"
-            >
-              <Unlock className="w-4 h-4" />
-              <span>ចូលប្រើប្រាស់ប្រព័ន្ធ (Login)</span>
-            </button>
-          </form>
-
-          <div className="mt-5 pt-3.5 border-t border-slate-700/60 text-[11px] text-slate-400 space-y-1">
-            <p className="font-bold text-slate-300">ℹ️ ព័ត៌មានជំនួយលេខកូដសម្ងាត់ (PINs):</p>
-            <p>• <strong>Thai Samnang (Admin):</strong> <code>8888</code></p>
-            <p>• <strong>Manager (Supervisor):</strong> <code>0203</code></p>
-            <p>• <strong>Staff (បុគ្គលិក):</strong> <code>8899</code></p>
-            <p>• <strong>Kitchen (ផ្ទះបាយ):</strong> <code>1234</code></p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // =========================================================================
-  // 4. MAIN APPLICATION DASHBOARD
+  // MAIN APPLICATION DASHBOARD (ALL LOCKS REMOVED - DIRECT ACCESS)
   // =========================================================================
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 pb-16 font-sans">

@@ -125,8 +125,8 @@ export default function AntigravityDashboard() {
     } catch (e) {}
   }, [users]);
 
-  // Auth State
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  // Auth State (All Locks Removed)
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(INITIAL_USERS[0]);
   const [selectedUserId, setSelectedUserId] = useState<string>("u1");
   const [enteredPin, setEnteredPin] = useState<string>("");
   const [showPin, setShowPin] = useState<boolean>(false);
@@ -191,7 +191,7 @@ export default function AntigravityDashboard() {
   };
 
   const handleLockTerminal = () => {
-    setCurrentUser(null);
+    setCurrentUser(users[0] || INITIAL_USERS[0]);
     setEnteredPin("");
     setSelectedUserId("u1");
     setAuthError("");
@@ -316,245 +316,7 @@ export default function AntigravityDashboard() {
   }, [items, selectedBrand, searchTerm]);
 
   // ==========================================
-  // VIEW: AUTHENTICATION (SAFE PIN LOCK)
-  // ==========================================
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 selection:bg-indigo-500 selection:text-white">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl pointer-events-none" />
-
-        <div className="relative z-10 w-full max-w-md bg-slate-800/95 border border-slate-700/80 rounded-3xl p-6 sm:p-8 shadow-2xl backdrop-blur-md space-y-5">
-          {/* Header */}
-          <div className="text-center space-y-1.5">
-            <div className="w-14 h-14 rounded-2xl bg-indigo-600 text-white mx-auto flex items-center justify-center shadow-lg shadow-indigo-600/30">
-              <Lock className="w-7 h-7" />
-            </div>
-            <h1 className="text-xl font-black text-white tracking-tight">
-              ប្រព័ន្ធគ្រប់គ្រងផ្ទះបាយកណ្តាល
-            </h1>
-            <p className="text-xs text-indigo-300 font-medium">
-              Central Kitchen &amp; Store Distribution Dashboard
-            </p>
-          </div>
-
-          {/* Quick 1-Click Auto Login Buttons */}
-          <div className="space-y-1.5">
-            <div className="text-[11px] font-bold text-slate-300 flex items-center justify-between">
-              <span>⚡ ចូលភ្លាមៗ (Quick 1-Click Login):</span>
-              <span className="text-[10px] text-emerald-400 font-medium">ចុច ១ ដងចូលភ្លាម</span>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {users.map((u) => (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => quickLogin(u)}
-                  className="p-2.5 rounded-xl bg-slate-900/80 border border-slate-700 hover:border-indigo-500 text-left transition-all cursor-pointer group"
-                >
-                  <div className="text-xs font-bold text-white group-hover:text-indigo-300 truncate">
-                    {u.name}
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">
-                    {u.role} ({u.pin})
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="relative flex py-1 items-center">
-            <div className="flex-grow border-t border-slate-700"></div>
-            <span className="flex-shrink mx-3 text-[10px] text-slate-400 uppercase font-semibold">
-              ឬ ជ្រើសរើស និងវាយលេខ PIN
-            </span>
-            <div className="flex-grow border-t border-slate-700"></div>
-          </div>
-
-          {/* User Selection Radio Cards */}
-          <div className="space-y-2">
-            <label className="block text-xs font-bold text-slate-300">
-              ជ្រើសរើសគណនី (Select User):
-            </label>
-            <div className="grid grid-cols-1 gap-2">
-              {users.map((u) => {
-                const isSelected = selectedUserId === u.id;
-                return (
-                  <button
-                    key={u.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedUserId(u.id);
-                      setEnteredPin("");
-                      setAuthError("");
-                    }}
-                    className={`flex items-center justify-between p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                      isSelected
-                        ? "bg-indigo-950/60 border-indigo-500 text-white ring-1 ring-indigo-500"
-                        : "bg-slate-900/60 border-slate-700 hover:border-slate-500 text-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
-                          u.role === "Admin"
-                            ? "bg-purple-900/60 text-purple-300 border border-purple-700"
-                            : u.role === "Manager"
-                            ? "bg-amber-900/60 text-amber-300 border border-amber-700"
-                            : "bg-blue-900/60 text-blue-300 border border-blue-700"
-                        }`}
-                      >
-                        <User className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-white">{u.name}</div>
-                        <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                          <span>{u.role}</span>
-                          {u.canViewFinancials && (
-                            <span className="text-emerald-400 font-semibold">• មើលលុយ ($)</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <span
-                      className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                        u.role === "Admin"
-                          ? "bg-purple-950 text-purple-300 border border-purple-800"
-                          : u.role === "Manager"
-                          ? "bg-amber-950 text-amber-300 border border-amber-800"
-                          : "bg-blue-950 text-blue-300 border border-blue-800"
-                      }`}
-                    >
-                      {u.role}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* PIN Input Form */}
-          <form onSubmit={handleLogin} className="space-y-3.5">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs font-bold text-slate-300">
-                  លេខកូដ PIN ៤ ខ្ទង់ (Passcode):
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowPin(!showPin)}
-                  className="text-xs text-slate-400 hover:text-white flex items-center gap-1 font-semibold cursor-pointer"
-                >
-                  {showPin ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  <span>{showPin ? "លាក់" : "បង្ហាញ"}</span>
-                </button>
-              </div>
-
-              <div className="relative">
-                <input
-                  type={showPin ? "text" : "password"}
-                  maxLength={4}
-                  value={enteredPin}
-                  onChange={(e) => {
-                    if (/^\d*$/.test(e.target.value)) {
-                      setEnteredPin(e.target.value);
-                      setAuthError("");
-                    }
-                  }}
-                  disabled={isLocked}
-                  placeholder="••••"
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl py-2.5 px-4 text-center font-mono text-2xl font-black tracking-widest text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:bg-slate-900 transition-all"
-                />
-              </div>
-
-              {/* Dot Indicators */}
-              <div className="flex justify-center gap-3 mt-2">
-                {[0, 1, 2, 3].map((idx) => (
-                  <div
-                    key={idx}
-                    className={`w-2.5 h-2.5 rounded-full transition-all ${
-                      enteredPin.length > idx ? "bg-indigo-500 scale-110" : "bg-slate-700"
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* Error Message */}
-            {authError && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-bold flex items-center gap-2">
-                <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
-                <span>{authError}</span>
-              </div>
-            )}
-
-            {/* Touch Numpad */}
-            <div className="grid grid-cols-3 gap-2 pt-1">
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9"].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  disabled={isLocked}
-                  onClick={() => handleNumClick(n)}
-                  className="py-2.5 bg-slate-900 hover:bg-slate-700 active:bg-slate-600 rounded-xl font-mono text-base font-bold text-white transition-all cursor-pointer disabled:opacity-50 border border-slate-800"
-                >
-                  {n}
-                </button>
-              ))}
-              <button
-                type="button"
-                disabled={isLocked}
-                onClick={handleNumClear}
-                className="py-2.5 bg-slate-900 hover:bg-rose-950 text-rose-400 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50 border border-slate-800"
-              >
-                Clear
-              </button>
-              <button
-                type="button"
-                disabled={isLocked}
-                onClick={() => handleNumClick("0")}
-                className="py-2.5 bg-slate-900 hover:bg-slate-700 active:bg-slate-600 rounded-xl font-mono text-base font-bold text-white transition-all cursor-pointer disabled:opacity-50 border border-slate-800"
-              >
-                0
-              </button>
-              <button
-                type="button"
-                disabled={isLocked}
-                onClick={handleNumBackspace}
-                className="py-2.5 bg-slate-900 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50 border border-slate-800"
-              >
-                ⌫
-              </button>
-            </div>
-
-            {/* Login Button */}
-            <button
-              type="submit"
-              disabled={isLocked || enteredPin.length !== 4}
-              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs uppercase tracking-wider shadow-lg shadow-indigo-950 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Unlock className="w-4 h-4" />
-              <span>ចូលប្រព័ន្ធ (Unlock &amp; Login)</span>
-            </button>
-          </form>
-
-          {/* Quick Return to Main Dashboard */}
-          <div className="pt-2 text-center">
-            <Link
-              href="/"
-              className="text-xs text-slate-400 hover:text-white flex items-center justify-center gap-1.5 font-semibold"
-            >
-              <Home className="w-3.5 h-3.5" />
-              <span>ត្រឡប់ទៅ Main Dashboard វិញ</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ==========================================
-  // VIEW: MAIN AUTHENTICATED DASHBOARD
+  // VIEW: MAIN AUTHENTICATED DASHBOARD (ALL LOCKS REMOVED - DIRECT ACCESS)
   // ==========================================
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 pb-16 font-sans">
@@ -629,16 +391,6 @@ export default function AntigravityDashboard() {
             >
               <Printer className="w-3.5 h-3.5 text-slate-600" />
               <span>Print</span>
-            </button>
-
-            {/* Lock Terminal Button */}
-            <button
-              onClick={handleLockTerminal}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold border border-rose-200 transition-colors shrink-0 cursor-pointer"
-              title="ចាក់សោរបញ្ជរ (Lock Terminal)"
-            >
-              <Lock className="w-3.5 h-3.5" />
-              <span>Lock Terminal</span>
             </button>
           </div>
         </div>
