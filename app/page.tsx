@@ -40,7 +40,6 @@ import { STARTER_ITEMS } from "@/lib/starter-items";
 import { AuditLogEntry } from "@/lib/types";
 import QRCodeModal from "@/components/QRCodeModal";
 import ApprovalQueue from "@/components/ApprovalQueue";
-import SettingsMenu from "@/components/SettingsMenu";
 
 // =========================================================================
 // 1. DATA TYPES & INTERFACES
