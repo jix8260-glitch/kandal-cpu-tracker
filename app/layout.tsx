@@ -3,6 +3,8 @@ import './globals.css';
 import { Navbar } from '@/components/Navbar';
 import { AuthProvider } from '@/components/AuthLock';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'CPU (Central Production Unit) - Kandal Commissary Kitchen',
   description: 'Daily Stock & Cost Per Unit (CPU) Tracker for Kandal Commissary Kitchen (Tube Coffee & OnMart)',

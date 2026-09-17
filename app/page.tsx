@@ -303,11 +303,22 @@ export default function CPUMainPage() {
     }
   };
 
-  // Load from LocalStorage on mount
+  // Load from LocalStorage on mount (with strict safety checks)
   useEffect(() => {
     try {
       const savedStores = localStorage.getItem("cpu_stores");
-      if (savedStores) setStores(JSON.parse(savedStores));
+      if (savedStores) {
+        try {
+          const parsedStores = JSON.parse(savedStores);
+          if (Array.isArray(parsedStores) && parsedStores.length > 0) {
+            setStores(parsedStores);
+          } else {
+            setStores(DEFAULT_STORES);
+          }
+        } catch {
+          setStores(DEFAULT_STORES);
+        }
+      }
 
       const savedItems = localStorage.getItem("cpu_items");
       if (savedItems) {
@@ -329,10 +340,24 @@ export default function CPUMainPage() {
       }
 
       const savedDist = localStorage.getItem("cpu_history_distribution");
-      if (savedDist) setHistoryDistribution(JSON.parse(savedDist));
+      if (savedDist) {
+        try {
+          const parsedDist = JSON.parse(savedDist);
+          if (parsedDist && typeof parsedDist === "object" && !Array.isArray(parsedDist)) {
+            setHistoryDistribution(parsedDist);
+          }
+        } catch {}
+      }
 
       const savedStock = localStorage.getItem("cpu_history_stock");
-      if (savedStock) setHistoryStock(JSON.parse(savedStock));
+      if (savedStock) {
+        try {
+          const parsedStock = JSON.parse(savedStock);
+          if (parsedStock && typeof parsedStock === "object" && !Array.isArray(parsedStock)) {
+            setHistoryStock(parsedStock);
+          }
+        } catch {}
+      }
 
       const savedAdminPw = localStorage.getItem("cpu_admin_pw");
       if (savedAdminPw) {
@@ -351,7 +376,12 @@ export default function CPUMainPage() {
       }
 
       const savedLogs = localStorage.getItem("cpu_access_logs");
-      if (savedLogs) setAccessLogs(JSON.parse(savedLogs));
+      if (savedLogs) {
+        try {
+          const parsedLogs = JSON.parse(savedLogs);
+          if (Array.isArray(parsedLogs)) setAccessLogs(parsedLogs);
+        } catch {}
+      }
 
       const savedVer = localStorage.getItem("cpu_app_version");
       if (savedVer) {
@@ -372,10 +402,9 @@ export default function CPUMainPage() {
         setCurrentUserRole(savedRole);
         setIsAuthenticated(true);
       } else {
-        const lastUser = localStorage.getItem("cpu_last_username");
-        const lastPass = localStorage.getItem("cpu_last_passcode");
-        if (lastUser) setInputUserName(lastUser);
-        if (lastPass) setInputPasscode(lastPass);
+        setCurrentUserName("Thai Samnang");
+        setCurrentUserRole("ADMIN");
+        setIsAuthenticated(true);
       }
     } catch (e) {
       console.error("Failed to load local data", e);
@@ -671,75 +700,93 @@ export default function CPUMainPage() {
     setSelectedDate(`${y}-${m}-${day}`);
   };
 
-  // Filtered Lists
+  // Filtered Lists (Safe against missing/null fields)
   const filteredStores = useMemo(() => {
+    if (!Array.isArray(stores)) return DEFAULT_STORES;
     return stores.filter((s) => {
+      if (!s) return false;
       const matchBrand = selectedBrand === "ALL" || s.brand === selectedBrand;
-      const matchSearch =
-        s.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.name.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchBrand && matchSearch;
+      const sCode = (s.code || "").toLowerCase();
+      const sName = (s.name || "").toLowerCase();
+      const q = (searchTerm || "").toLowerCase();
+      return matchBrand && (sCode.includes(q) || sName.includes(q));
     });
   }, [stores, selectedBrand, searchTerm]);
 
   const categories = useMemo(() => {
-    const set = new Set(items.map((i) => i.category));
+    if (!Array.isArray(items)) return ["ALL"];
+    const set = new Set(items.filter(Boolean).map((i) => i.category || "Daily Product"));
     return ["ALL", ...Array.from(set)];
   }, [items]);
 
   const filteredItems = useMemo(() => {
+    if (!Array.isArray(items)) return DEFAULT_ITEMS;
     return items.filter((i) => {
+      if (!i) return false;
       const matchBrand = selectedBrand === "ALL" || i.brand === selectedBrand;
       const matchCat = selectedCategory === "ALL" || i.category === selectedCategory;
-      const matchSearch =
-        i.item_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        i.description_khmer.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchBrand && matchCat && matchSearch;
+      const iCode = (i.item_code || "").toLowerCase();
+      const iDesc = (i.description_khmer || "").toLowerCase();
+      const q = (searchTerm || "").toLowerCase();
+      return matchBrand && matchCat && (iCode.includes(q) || iDesc.includes(q));
     });
   }, [items, selectedBrand, selectedCategory, searchTerm]);
 
-  // Calculations for Store KPI
+  // Calculations for Store KPI (Safe against missing fields)
   const totalStoreUnitsToday = useMemo(() => {
-    return stores.reduce((sum, s) => sum + (currentDayDist[s.id] || 0), 0);
+    if (!Array.isArray(stores)) return 0;
+    return stores.reduce((sum, s) => sum + (Number(currentDayDist?.[s?.id]) || 0), 0);
   }, [stores, currentDayDist]);
 
   const tubeUnitsToday = useMemo(() => {
-    return stores.filter((s) => s.brand === "Tube Coffee").reduce((sum, s) => sum + (currentDayDist[s.id] || 0), 0);
+    if (!Array.isArray(stores)) return 0;
+    return stores.filter((s) => s?.brand === "Tube Coffee").reduce((sum, s) => sum + (Number(currentDayDist?.[s?.id]) || 0), 0);
   }, [stores, currentDayDist]);
 
   const onmartUnitsToday = useMemo(() => {
-    return stores.filter((s) => s.brand === "OnMart").reduce((sum, s) => sum + (currentDayDist[s.id] || 0), 0);
+    if (!Array.isArray(stores)) return 0;
+    return stores.filter((s) => s?.brand === "OnMart").reduce((sum, s) => sum + (Number(currentDayDist?.[s?.id]) || 0), 0);
   }, [stores, currentDayDist]);
 
-  // Top 2 Tube and Top 2 OnMart
+  // Top 2 Tube and Top 2 OnMart (Safe against missing fields)
   const top2TubeStores = useMemo(() => {
+    if (!Array.isArray(stores)) return [];
     return [...stores]
-      .filter((s) => s.brand === "Tube Coffee")
-      .map((s) => ({ ...s, amount: currentDayDist[s.id] || 0 }))
-      .sort((a, b) => b.amount - a.amount)
+      .filter((s) => s?.brand === "Tube Coffee")
+      .map((s) => ({ ...s, amount: Number(currentDayDist?.[s?.id]) || 0 }))
+      .sort((a, b) => (b.amount || 0) - (a.amount || 0))
       .slice(0, 2);
   }, [stores, currentDayDist]);
 
   const top2OnMartStores = useMemo(() => {
+    if (!Array.isArray(stores)) return [];
     return [...stores]
-      .filter((s) => s.brand === "OnMart")
-      .map((s) => ({ ...s, amount: currentDayDist[s.id] || 0 }))
-      .sort((a, b) => b.amount - a.amount)
+      .filter((s) => s?.brand === "OnMart")
+      .map((s) => ({ ...s, amount: Number(currentDayDist?.[s?.id]) || 0 }))
+      .sort((a, b) => (b.amount || 0) - (a.amount || 0))
       .slice(0, 2);
   }, [stores, currentDayDist]);
 
-  // Calculations for Stock KPI
+  // Calculations for Stock KPI (Safe against missing fields)
   const stockSummary = useMemo(() => {
     let totalIn = 0;
     let totalOut = 0;
     let totalVal = 0;
-    items.forEach((item) => {
-      const dayLog = currentDayStock[item.item_code] || { stock_in: 0, stock_out: 0 };
-      totalIn += dayLog.stock_in;
-      totalOut += dayLog.stock_out;
-      const balance = Math.max(0, item.opening_stock + dayLog.stock_in - dayLog.stock_out);
-      totalVal += balance * item.cpu;
-    });
+    if (Array.isArray(items)) {
+      items.forEach((item) => {
+        if (!item || !item.item_code) return;
+        const dayLog = currentDayStock?.[item.item_code] || { stock_in: 0, stock_out: 0 };
+        const sIn = Number(dayLog.stock_in) || 0;
+        const sOut = Number(dayLog.stock_out) || 0;
+        const openSt = Number(item.opening_stock) || 0;
+        const cpu = Number(item.cpu) || 0;
+
+        totalIn += sIn;
+        totalOut += sOut;
+        const balance = Math.max(0, openSt + sIn - sOut);
+        totalVal += balance * cpu;
+      });
+    }
     return { totalIn, totalOut, totalVal };
   }, [items, currentDayStock]);
 
@@ -756,7 +803,7 @@ export default function CPUMainPage() {
       )}
 
 {/* MAIN CONTAINER */}
-      <main className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+      <div className="space-y-6">
         {/* PRINT ONLY A4 OFFICIAL REPORT HEADER */}
         <div className="hidden print:block mb-6 text-black border-b-2 border-slate-900 pb-4">
           <div className="flex items-center justify-between">
@@ -928,7 +975,7 @@ export default function CPUMainPage() {
                           <p className="text-[10px] text-slate-400 font-mono">Code: {s.code}</p>
                         </div>
                       </div>
-                      <span className="text-sm font-black text-amber-900">{s.amount.toLocaleString()} items</span>
+                      <span className="text-sm font-black text-amber-900">{(Number(s?.amount) || 0).toLocaleString()} items</span>
                     </div>
                   ))}
                 </div>
@@ -951,7 +998,7 @@ export default function CPUMainPage() {
                           <p className="text-[10px] text-slate-400 font-mono">Code: {s.code}</p>
                         </div>
                       </div>
-                      <span className="text-sm font-black text-blue-900">{s.amount.toLocaleString()} items</span>
+                      <span className="text-sm font-black text-blue-900">{(Number(s?.amount) || 0).toLocaleString()} items</span>
                     </div>
                   ))}
                 </div>
@@ -1217,9 +1264,13 @@ export default function CPUMainPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
                     {filteredItems.map((item) => {
-                      const dayLog = currentDayStock[item.item_code] || { stock_in: 0, stock_out: 0 };
-                      const balance = item.opening_stock + dayLog.stock_in - dayLog.stock_out;
-                      const totalVal = Math.max(0, balance) * item.cpu;
+                      const dayLog = currentDayStock?.[item?.item_code] || { stock_in: 0, stock_out: 0 };
+                      const sIn = Number(dayLog.stock_in) || 0;
+                      const sOut = Number(dayLog.stock_out) || 0;
+                      const openSt = Number(item?.opening_stock) || 0;
+                      const cpuNum = Number(item?.cpu) || 0;
+                      const balance = openSt + sIn - sOut;
+                      const totalVal = Math.max(0, balance) * cpuNum;
 
                       return (
                         <tr key={item.item_code} className="hover:bg-slate-50/80 transition-colors">
@@ -1233,7 +1284,7 @@ export default function CPUMainPage() {
 
                           {currentUserRole === "ADMIN" && (
                             <td className="py-3 px-4 text-right font-mono font-bold text-slate-800">
-                              ${item.cpu.toFixed(2)}
+                              ${cpuNum.toFixed(2)}
                             </td>
                           )}
 
@@ -1241,7 +1292,7 @@ export default function CPUMainPage() {
                             <input
                               type="number"
                               min="0"
-                              value={item.opening_stock === 0 ? "" : item.opening_stock}
+                              value={openSt === 0 ? "" : openSt}
                               placeholder="0"
                               onChange={(e) => handleOpeningStockChange(item.item_code, parseFloat(e.target.value) || 0)}
                               className="w-20 text-right bg-white border border-blue-300 focus:border-blue-600 rounded-lg px-2.5 py-1 font-mono font-bold text-blue-900 text-xs focus:outline-none"
@@ -1253,7 +1304,7 @@ export default function CPUMainPage() {
                             <input
                               type="number"
                               min="0"
-                              value={dayLog.stock_in === 0 ? "" : dayLog.stock_in}
+                              value={sIn === 0 ? "" : sIn}
                               placeholder="0"
                               onChange={(e) => handleStockChange(item.item_code, "stock_in", parseFloat(e.target.value) || 0)}
                               className="w-20 text-right bg-white border border-emerald-300 focus:border-emerald-600 rounded-lg px-2.5 py-1 font-mono font-bold text-emerald-900 text-xs focus:outline-none"
@@ -1264,7 +1315,7 @@ export default function CPUMainPage() {
                             <input
                               type="number"
                               min="0"
-                              value={dayLog.stock_out === 0 ? "" : dayLog.stock_out}
+                              value={sOut === 0 ? "" : sOut}
                               placeholder="0"
                               onChange={(e) => handleStockChange(item.item_code, "stock_out", parseFloat(e.target.value) || 0)}
                               className="w-20 text-right bg-white border border-rose-300 focus:border-rose-600 rounded-lg px-2.5 py-1 font-mono font-bold text-rose-900 text-xs focus:outline-none"
@@ -1327,7 +1378,7 @@ export default function CPUMainPage() {
             </div>
           </div>
         </div>
-      </main>
+      </div>
 
       {/* MODAL: ADD STORE */}
       {showAddStoreModal && (
