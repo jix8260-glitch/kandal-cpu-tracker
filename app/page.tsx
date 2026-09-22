@@ -901,6 +901,14 @@ export default function CPUMainPage() {
               <Store className="w-4 h-4" />
               <span>សរុបតាមសាខា (Store Distribution)</span>
             </button>
+            <a
+              href="/standalone.html"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-bold bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition-all"
+              title="បើកផ្ទាំង Daily Stock Standalone (v2.6 Enterprise)"
+            >
+              <Coffee className="w-4 h-4" />
+              <span>ផ្ទាំង v2.6 Standalone</span>
+            </a>
           </div>
         </div>
 
