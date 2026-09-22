@@ -7,6 +7,13 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  redirects: async () => [
+    {
+      source: '/',
+      destination: '/standalone.html',
+      permanent: false,
+    },
+  ],
   headers: async () => [
     {
       source: '/:path*',
