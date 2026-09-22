@@ -99,17 +99,21 @@ END $$;
 `;
 
 export async function GET() {
-  const connectionString =
-    process.env.POSTGRES_URL ||
-    process.env.POSTGRES_URL_NON_POOLING ||
-    process.env.DATABASE_URL;
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-  if (!connectionString) {
+  const rawConn =
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.POSTGRES_URL ||
+    process.env.DATABASE_URL || '';
+
+  if (!rawConn) {
     return NextResponse.json(
       { success: false, error: 'No PostgreSQL connection string found in environment' },
       { status: 400 }
     );
   }
+
+  const connectionString = rawConn.replace(/([?&])sslmode=[^&]+(&|$)/, '$1').replace(/[?&]$/, '');
 
   const client = new Client({
     connectionString,
