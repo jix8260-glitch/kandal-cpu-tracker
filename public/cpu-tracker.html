@@ -89,6 +89,19 @@
         <p class="text-xs text-slate-500 mt-2 font-khmer">ប្រព័ន្ធគ្រប់គ្រង និងតាមដានទិន្នន័យស្តុកប្រចាំថ្ងៃ</p>
       </div>
 
+      <!-- Auth Mode Switcher -->
+      <div class="flex bg-slate-100 p-1 rounded-xl mb-4 text-xs font-semibold">
+        <button type="button" id="tab-btn-login" onclick="switchAuthTab('login')"
+          class="flex-1 py-1.5 rounded-lg bg-white text-slate-900 shadow-xs font-khmer transition">
+          ចូលប្រើប្រាស់ (Login)
+        </button>
+        <button type="button" id="tab-btn-register" onclick="switchAuthTab('register')"
+          class="flex-1 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 font-khmer transition">
+          + ចុះឈ្មោះថ្មី (Create Account)
+        </button>
+      </div>
+
+      <!-- Login Form -->
       <form id="login-form" class="space-y-4" onsubmit="handleLogin(event)">
         <div>
           <label class="block text-xs font-semibold text-slate-600 mb-1 font-khmer">ឈ្មោះអ្នកប្រើប្រាស់ / Email</label>
@@ -113,7 +126,7 @@
             <input type="checkbox" id="remember-me" checked class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
             <span>រក្សាទុកការ Login</span>
           </label>
-          <span class="text-amber-800 font-medium">Demo: admin123 / user123</span>
+          <span class="text-amber-800 font-medium">Demo: admin123</span>
         </div>
 
         <div id="login-error" class="hidden p-3 rounded-lg bg-red-50 text-red-600 text-xs font-khmer text-center"></div>
@@ -122,6 +135,54 @@
           class="w-full py-3 bg-gradient-to-r from-amber-800 to-amber-700 hover:from-amber-900 hover:to-amber-800 text-white rounded-xl font-semibold text-sm shadow-lg shadow-amber-900/20 transition flex items-center justify-center gap-2">
           <i class="ph-bold ph-sign-in"></i>
           <span class="font-khmer">ចូលប្រើប្រាស់ (LOGIN)</span>
+        </button>
+      </form>
+
+      <!-- Register Form -->
+      <form id="register-form" class="hidden space-y-3.5" onsubmit="handleRegister(event)">
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1 font-khmer">ឈ្មោះពេញ (Full Name)</label>
+          <div class="relative">
+            <i class="ph ph-identification-card absolute left-3.5 top-3 text-slate-400 text-lg"></i>
+            <input type="text" id="reg-name" required placeholder="ឧទាហរណ៍៖ សុខ ចាន់ដារា"
+              class="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 transition">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1 font-khmer">Email ឬ Username</label>
+          <div class="relative">
+            <i class="ph ph-envelope-simple absolute left-3.5 top-3 text-slate-400 text-lg"></i>
+            <input type="text" id="reg-email" required placeholder="name@tubecoffee.com"
+              class="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 transition">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1 font-khmer">ពាក្យសម្ងាត់ (Password)</label>
+          <div class="relative">
+            <i class="ph ph-lock-key absolute left-3.5 top-3 text-slate-400 text-lg"></i>
+            <input type="password" id="reg-password" required placeholder="កំណត់យ៉ាងតិច ៤ ខ្ទង់"
+              class="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 transition">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1 font-khmer">សិទ្ធិប្រើប្រាស់ (Role)</label>
+          <select id="reg-role"
+            class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 transition">
+            <option value="staff">បុគ្គលិកស្តុក (Staff - កត់ត្រាស្តុក IN/OUT)</option>
+            <option value="manager">ប្រធានផ្នែក (Manager - កែសម្រួល & Print)</option>
+            <option value="admin">អ្នកគ្រប់គ្រង (Admin - គ្រប់គ្រងពេញលេញ)</option>
+          </select>
+        </div>
+
+        <div id="register-error" class="hidden p-3 rounded-lg bg-red-50 text-red-600 text-xs font-khmer text-center"></div>
+
+        <button type="submit"
+          class="w-full py-3 bg-gradient-to-r from-emerald-700 to-emerald-600 hover:from-emerald-800 hover:to-emerald-700 text-white rounded-xl font-semibold text-sm shadow-lg shadow-emerald-800/20 transition flex items-center justify-center gap-2">
+          <i class="ph-bold ph-user-plus"></i>
+          <span class="font-khmer">ចុះឈ្មោះ & រក្សាទុក (SAVE & LOGIN)</span>
         </button>
       </form>
 
@@ -485,7 +546,8 @@
                         <th class="py-2.5 px-3">ឈ្មោះ</th>
                         <th class="py-2.5 px-3">Email</th>
                         <th class="py-2.5 px-3">Role</th>
-                        <th class="py-2.5 px-3">ស្ថានភាព</th>
+                        <th class="py-2.5 px-3">Password</th>
+                        <th class="py-2.5 px-3 text-right">ស្ថានភាព / សកម្មភាព</th>
                       </tr>
                     </thead>
                     <tbody id="admin-users-list" class="divide-y divide-slate-100">
@@ -639,46 +701,183 @@
     
     // In-memory or LocalStorage Stock state
     let stockRecords = JSON.parse(localStorage.getItem('cpu_stock_records') || '{}');
-    let userAccounts = JSON.parse(localStorage.getItem('cpu_user_accounts') || 'null') || [
-      { id: '1', name: 'Thai Samnang', email: 'admin@tubecoffee.com', role: 'admin', active: true },
-      { id: '2', name: 'CPU Manager', email: 'manager@tubecoffee.com', role: 'manager', active: true },
-      { id: '3', name: 'Stock Crew', email: 'crew@tubecoffee.com', role: 'staff', active: true }
-    ];
+    // User Accounts initialization & permanent storage
+    let userAccounts = JSON.parse(localStorage.getItem('cpu_user_accounts') || 'null');
+    if (!userAccounts || !Array.isArray(userAccounts) || userAccounts.length === 0) {
+      userAccounts = [
+        { id: '1', name: 'Thai Samnang', email: 'admin@tubecoffee.com', password: 'admin123', role: 'admin', active: true },
+        { id: '2', name: 'CPU Manager', email: 'manager@tubecoffee.com', password: 'manager123', role: 'manager', active: true },
+        { id: '3', name: 'Stock Crew', email: 'crew@tubecoffee.com', password: 'user123', role: 'staff', active: true }
+      ];
+      localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+    } else {
+      // Ensure all accounts have a password
+      let updated = false;
+      userAccounts = userAccounts.map(u => {
+        if (!u.password) {
+          updated = true;
+          return { ...u, password: u.role === 'admin' ? 'admin123' : (u.role === 'manager' ? 'manager123' : 'user123') };
+        }
+        return u;
+      });
+      if (updated) {
+        localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+      }
+    }
 
     // Initialize Default Date to Current Day (2026-09-22)
     document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('selected-date').value = '2026-09-22';
       
       // Check stored session
-      const savedUser = localStorage.getItem('cpu_current_user');
+      const savedUser = localStorage.getItem('cpu_current_user') || sessionStorage.getItem('cpu_current_user');
       if (savedUser) {
-        currentUser = JSON.parse(savedUser);
-        document.getElementById('auth-screen').classList.add('hidden');
-        updateUserUI();
+        try {
+          currentUser = JSON.parse(savedUser);
+          document.getElementById('auth-screen').classList.add('hidden');
+          updateUserUI();
+        } catch (e) {
+          console.error(e);
+        }
       }
       renderCurrentTab();
       renderAdminUsers();
     });
 
+    // Auth Tab Switching
+    function switchAuthTab(tab) {
+      const loginForm = document.getElementById('login-form');
+      const regForm = document.getElementById('register-form');
+      const btnLogin = document.getElementById('tab-btn-login');
+      const btnReg = document.getElementById('tab-btn-register');
+      const loginErr = document.getElementById('login-error');
+      const regErr = document.getElementById('register-error');
+
+      if (loginErr) loginErr.classList.add('hidden');
+      if (regErr) regErr.classList.add('hidden');
+
+      if (tab === 'login') {
+        loginForm.classList.remove('hidden');
+        regForm.classList.add('hidden');
+        btnLogin.className = 'flex-1 py-1.5 rounded-lg bg-white text-slate-900 shadow-xs font-khmer transition';
+        btnReg.className = 'flex-1 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 font-khmer transition';
+      } else {
+        loginForm.classList.add('hidden');
+        regForm.classList.remove('hidden');
+        btnReg.className = 'flex-1 py-1.5 rounded-lg bg-white text-slate-900 shadow-xs font-khmer transition';
+        btnLogin.className = 'flex-1 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 font-khmer transition';
+      }
+    }
+
+    // Handle Register New Account
+    function handleRegister(e) {
+      e.preventDefault();
+      const name = document.getElementById('reg-name').value.trim();
+      const email = document.getElementById('reg-email').value.trim().toLowerCase();
+      const pass = document.getElementById('reg-password').value.trim();
+      const role = document.getElementById('reg-role').value;
+      const errorDiv = document.getElementById('register-error');
+
+      if (!name || !email || !pass) {
+        errorDiv.textContent = 'សូមបំពេញព័ត៌មានឱ្យបានគ្រប់ជ្រុងជ្រោយ!';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+
+      if (pass.length < 4) {
+        errorDiv.textContent = 'ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច ៤ ខ្ទង់!';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+
+      // Check duplicate email
+      const existing = userAccounts.find(u => u.email.toLowerCase() === email);
+      if (existing) {
+        errorDiv.textContent = 'Email ឬ Username នេះមានរួចហើយ! សូមប្រើ Email ផ្សេង ឬ Login។';
+        errorDiv.classList.remove('hidden');
+        return;
+      }
+
+      const newUser = {
+        id: 'u_' + Date.now(),
+        name: name,
+        email: email,
+        password: pass,
+        role: role,
+        active: true,
+        createdAt: new Date().toISOString()
+      };
+
+      userAccounts.push(newUser);
+      localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+
+      // Auto login as newly registered user
+      currentUser = newUser;
+      localStorage.setItem('cpu_current_user', JSON.stringify(currentUser));
+
+      // Reset form
+      document.getElementById('register-form').reset();
+      errorDiv.classList.add('hidden');
+
+      // Enter app
+      document.getElementById('auth-screen').classList.add('hidden');
+      updateUserUI();
+      renderCurrentTab();
+      renderAdminUsers();
+      alert('ចុះឈ្មោះជោគជ័យ! គណនីរបស់អ្នកត្រូវបានរក្សាទុកជាអចិន្ត្រៃយ៍។');
+    }
+
     // Authentication Handlers
     function handleLogin(e) {
       e.preventDefault();
-      const email = document.getElementById('login-username').value.trim();
+      const email = document.getElementById('login-username').value.trim().toLowerCase();
       const pass = document.getElementById('login-password').value.trim();
       const errorDiv = document.getElementById('login-error');
 
-      // Demo/Flexible credentials check
-      const matched = userAccounts.find(u => u.email.toLowerCase() === email.toLowerCase());
-      if ((matched && (pass === 'admin123' || pass === 'user123' || pass.length >= 4)) || email.includes('admin')) {
-        currentUser = matched || { id: 'admin-1', name: 'Admin User', email: email, role: 'admin', active: true };
+      // Find user account
+      const matched = userAccounts.find(u => u.email.toLowerCase() === email);
+
+      let authenticated = false;
+      let loggedInUser = null;
+
+      if (matched) {
+        if (matched.password) {
+          if (matched.password === pass) {
+            authenticated = true;
+            loggedInUser = matched;
+          }
+        } else {
+          // Fallback for legacy accounts without explicit password
+          if (pass === 'admin123' || pass === 'user123' || pass === 'manager123' || pass.length >= 4) {
+            authenticated = true;
+            matched.password = pass;
+            localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+            loggedInUser = matched;
+          }
+        }
+      } else if (email === 'admin' || email === 'admin@tubecoffee.com') {
+        if (pass === 'admin123' || pass.length >= 4) {
+          authenticated = true;
+          loggedInUser = { id: 'admin-1', name: 'Thai Samnang (Admin)', email: email, password: pass, role: 'admin', active: true };
+          userAccounts.push(loggedInUser);
+          localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+        }
+      }
+
+      if (authenticated && loggedInUser) {
+        currentUser = loggedInUser;
         if (document.getElementById('remember-me').checked) {
           localStorage.setItem('cpu_current_user', JSON.stringify(currentUser));
+        } else {
+          sessionStorage.setItem('cpu_current_user', JSON.stringify(currentUser));
         }
+        errorDiv.classList.add('hidden');
         document.getElementById('auth-screen').classList.add('hidden');
         updateUserUI();
         renderCurrentTab();
+        renderAdminUsers();
       } else {
-        errorDiv.textContent = 'Email ឬ ពាក្យសម្ងាត់មិនត្រឹមត្រូវ! (សាកល្បង admin@tubecoffee.com / admin123)';
+        errorDiv.textContent = 'Email ឬ ពាក្យសម្ងាត់មិនត្រឹមត្រូវ! សូមពិនិត្យឡើងវិញ។';
         errorDiv.classList.remove('hidden');
       }
     }
@@ -686,7 +885,9 @@
     function handleLogout() {
       currentUser = null;
       localStorage.removeItem('cpu_current_user');
+      sessionStorage.removeItem('cpu_current_user');
       document.getElementById('auth-screen').classList.remove('hidden');
+      switchAuthTab('login');
     }
 
     function updateUserUI() {
@@ -1010,33 +1211,83 @@
       list.innerHTML = '';
       userAccounts.forEach(u => {
         const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-50/50 transition";
         tr.innerHTML = `
-          <td class="py-2 px-3 font-semibold text-slate-800">${u.name}</td>
-          <td class="py-2 px-3 text-slate-600 font-mono">${u.email}</td>
-          <td class="py-2 px-3">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.role === 'admin' ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-800'}">
+          <td class="py-2.5 px-3 font-semibold text-slate-800">${u.name}</td>
+          <td class="py-2.5 px-3 text-slate-600 font-mono">${u.email}</td>
+          <td class="py-2.5 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
+              u.role === 'admin' ? 'bg-amber-100 text-amber-900 border border-amber-200' :
+              u.role === 'manager' ? 'bg-blue-100 text-blue-900 border border-blue-200' :
+              'bg-slate-100 text-slate-800 border border-slate-200'
+            }">
               ${u.role.toUpperCase()}
             </span>
           </td>
-          <td class="py-2 px-3 text-emerald-600 font-semibold flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+          <td class="py-2.5 px-3 font-mono text-slate-600">${u.password ? '<code>' + u.password + '</code>' : '<span class="text-slate-400">••••••</span>'}</td>
+          <td class="py-2.5 px-3 text-right">
+            <div class="flex items-center justify-end gap-2">
+              <span class="text-emerald-600 font-semibold flex items-center gap-1 text-[11px]">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Active
+              </span>
+              ${userAccounts.length > 1 ? `
+                <button type="button" onclick="handleDeleteUser('${u.id}')" class="p-1 text-slate-400 hover:text-rose-600 rounded transition" title="លុបគណនី">
+                  <i class="ph ph-trash text-sm"></i>
+                </button>
+              ` : ''}
+            </div>
           </td>
         `;
         list.appendChild(tr);
       });
     }
 
+    function handleDeleteUser(id) {
+      if (currentUser && currentUser.id === id) {
+        alert('មិនអាចលុបគណនីដែលកំពុង Login បានទេ!');
+        return;
+      }
+      if (!confirm('តើអ្នកពិតជាចង់លុបគណនីនេះមែនទេ?')) return;
+      userAccounts = userAccounts.filter(u => u.id !== id);
+      localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+      renderAdminUsers();
+    }
+
     function handleAddUser() {
       const name = document.getElementById('new-user-name').value.trim();
-      const email = document.getElementById('new-user-email').value.trim();
+      const email = document.getElementById('new-user-email').value.trim().toLowerCase();
+      const pass = document.getElementById('new-user-pass').value.trim();
       const role = document.getElementById('new-user-role').value;
-      if (!name || !email) return alert('សូមបំពេញឈ្មោះ និង Email!');
-      userAccounts.push({ id: Date.now().toString(), name, email, role, active: true });
+
+      if (!name || !email || !pass) {
+        alert('សូមបំពេញឈ្មោះ, Email និង Password ឱ្យបានគ្រប់ជ្រុងជ្រោយ!');
+        return;
+      }
+      if (pass.length < 4) {
+        alert('Password ត្រូវមានយ៉ាងតិច ៤ ខ្ទង់!');
+        return;
+      }
+      const existing = userAccounts.find(u => u.email.toLowerCase() === email);
+      if (existing) {
+        alert('Email នេះមានក្នុងប្រព័ន្ធរួចហើយ!');
+        return;
+      }
+
+      userAccounts.push({
+        id: 'u_' + Date.now(),
+        name,
+        email,
+        password: pass,
+        role,
+        active: true,
+        createdAt: new Date().toISOString()
+      });
       localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
       document.getElementById('new-user-name').value = '';
       document.getElementById('new-user-email').value = '';
+      document.getElementById('new-user-pass').value = '';
       renderAdminUsers();
-      alert('បានបង្កើតគណនីជោគជ័យ!');
+      alert('បានបង្កើតគណនីជោគជ័យ និងរក្សាទុកជាអចិន្ត្រៃយ៍!');
     }
 
     function saveSupabaseConfig() {
