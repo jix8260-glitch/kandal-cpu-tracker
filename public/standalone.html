@@ -107,7 +107,7 @@
           <label class="block text-xs font-semibold text-slate-600 mb-1 font-khmer">ឈ្មោះអ្នកប្រើប្រាស់ / Email</label>
           <div class="relative">
             <i class="ph ph-user absolute left-3.5 top-3 text-slate-400 text-lg"></i>
-            <input type="text" id="login-username" required placeholder="admin@tubecoffee.com" value="admin@tubecoffee.com"
+            <input type="text" id="login-username" required placeholder="Email ឬ Username"
               class="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 transition">
           </div>
         </div>
@@ -116,7 +116,7 @@
           <label class="block text-xs font-semibold text-slate-600 mb-1 font-khmer">ពាក្យសម្ងាត់ / Password</label>
           <div class="relative">
             <i class="ph ph-lock-key absolute left-3.5 top-3 text-slate-400 text-lg"></i>
-            <input type="password" id="login-password" required placeholder="••••••••" value="admin123"
+            <input type="password" id="login-password" required placeholder="••••••••"
               class="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 transition">
           </div>
         </div>
@@ -126,7 +126,6 @@
             <input type="checkbox" id="remember-me" checked class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
             <span>រក្សាទុកការ Login</span>
           </label>
-          <span class="text-amber-800 font-medium">Demo: admin123</span>
         </div>
 
         <div id="login-error" class="hidden p-3 rounded-lg bg-red-50 text-red-600 text-xs font-khmer text-center"></div>
@@ -467,7 +466,7 @@
                 <h3 class="text-base font-bold text-slate-900 font-khmer">បញ្ជីមុខទំនិញមេ (Item Master — Cost Per Unit)</h3>
                 <p class="text-xs text-slate-500 font-khmer mt-0.5">Single source of truth — កំណត់តម្លៃដើម CPU និងតម្លៃលក់</p>
               </div>
-              <button onclick="openAddItemModal()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+              <button id="btn-add-master-item" onclick="openAddItemModal()" class="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
                 <i class="ph-bold ph-plus"></i>
                 <span class="font-khmer">បន្ថែមមុខទំនិញថ្មី</span>
               </button>
@@ -689,10 +688,270 @@
     </div>
   </div>
 
+  <!-- ================= EDIT ITEM PRICE MODAL ================= -->
+  <div id="edit-price-modal" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-amber-500/10 to-amber-600/5">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center text-lg shadow-xs">
+            <i class="ph-bold ph-currency-dollar"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-900 font-khmer">កែសម្រួលតម្លៃមុខទំនិញ</h3>
+            <p class="text-[11px] text-slate-500 font-khmer">សម្រាប់តែ Admin & Manager ប៉ុណ្ណោះ</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeEditPriceModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i class="ph-bold ph-x text-lg"></i>
+        </button>
+      </div>
+
+      <form id="edit-price-form" class="p-5 space-y-4" onsubmit="saveItemPrice(event)">
+        <input type="hidden" id="edit-item-code-hidden">
+        
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+          <div class="text-[11px] font-mono font-bold text-amber-800" id="edit-item-code-badge">CODE</div>
+          <div class="text-sm font-bold text-slate-800 font-khmer mt-0.5" id="edit-item-name-kh">Item Name KH</div>
+          <div class="text-[11px] text-slate-500 mt-0.5" id="edit-item-meta">Category • Size/UoM</div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1 font-khmer">ថ្លៃដើម CPU ($)</label>
+            <div class="relative">
+              <span class="absolute left-3 top-2.5 text-slate-400 font-mono text-xs">$</span>
+              <input type="number" step="0.001" min="0" id="edit-item-cpu" required
+                oninput="calcEditMargin()"
+                class="w-full pl-7 pr-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600">
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1 font-khmer">Cost Per Unit</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1 font-khmer">តម្លៃលក់ Selling ($)</label>
+            <div class="relative">
+              <span class="absolute left-3 top-2.5 text-slate-400 font-mono text-xs">$</span>
+              <input type="number" step="0.001" min="0" id="edit-item-selling" required
+                oninput="calcEditMargin()"
+                class="w-full pl-7 pr-3 py-2 text-xs rounded-xl border border-slate-300 font-mono font-bold focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600">
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1 font-khmer">Selling Price</p>
+          </div>
+        </div>
+
+        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200/70 flex items-center justify-between text-xs">
+          <span class="font-khmer text-emerald-800 font-medium">Margin ប៉ាន់ស្មាន (Profit):</span>
+          <span id="edit-item-margin-badge" class="font-mono font-bold text-emerald-700">0.0%</span>
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2.5">
+          <button type="button" onclick="closeEditPriceModal()"
+            class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 font-khmer transition">
+            បោះបង់ (Cancel)
+          </button>
+          <button type="submit"
+            class="px-5 py-2 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white font-khmer shadow-sm flex items-center gap-1.5 transition">
+            <i class="ph-bold ph-floppy-disk"></i>
+            <span>រក្សាទុកតម្លៃ (Save)</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ================= ADD ITEM MODAL ================= -->
+  <div id="add-item-modal" class="fixed inset-0 z-50 hidden bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-amber-50/50">
+        <h3 class="text-sm font-bold text-slate-900 font-khmer">បន្ថែមមុខទំនិញថ្មី (Add Master Item)</h3>
+        <button type="button" onclick="closeAddItemModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-lg">
+          <i class="ph-bold ph-x text-lg"></i>
+        </button>
+      </div>
+      <form id="add-item-form" class="p-5 space-y-3" onsubmit="handleAddNewItem(event)">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">កូដទំនិញ (Item Code)</label>
+          <input type="text" id="add-item-code" required placeholder="ឧ. V0099" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1 font-khmer">ឈ្មោះមុខទំនិញ (Khmer)</label>
+          <input type="text" id="add-item-name" required placeholder="ឧ. ទឹកដោះគោឆៅ" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-khmer">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Location</label>
+            <select id="add-item-loc" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white">
+              <option value="Tube Coffee+">Tube Coffee+</option>
+              <option value="OnMart">OnMart</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Category</label>
+            <select id="add-item-cat" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 bg-white">
+              <option value="Daily Product">Daily Product</option>
+              <option value="Dry Store">Dry Store</option>
+              <option value="Semi Product Sauce">Semi Product Sauce</option>
+              <option value="Semi Product Meat">Semi Product Meat</option>
+              <option value="Finished Product">Finished Product</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Size / UoM</label>
+            <input type="text" id="add-item-size" placeholder="1000g Pack" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">ថ្លៃដើម CPU ($)</label>
+            <input type="number" step="0.001" min="0" id="add-item-cpu" value="0.00" class="w-full px-3 py-2 text-xs rounded-xl border border-slate-300 font-mono">
+          </div>
+        </div>
+        <div class="pt-3 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeAddItemModal()" class="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl font-khmer">បោះបង់</button>
+          <button type="submit" class="px-5 py-2 text-xs bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-khmer font-semibold">+ បន្ថែមទំនិញ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- SEED DATA & JAVASCRIPT LOGIC -->
   <script>
     // All 105 Items from Daily Stock CPU 2026
-    const MASTER_ITEMS = [{"id": "item_001", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0003", "name_kh": "ក្រូចឆ្មា", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_002", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0004", "name_kh": "សណ្តែកបណ្តុះ", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_003", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0005", "name_kh": "ត្រកួនចិន", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_004", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0008", "name_kh": "ប៉េងប៉ោះទុំ", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_005", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0009", "name_kh": "ខ្ទឹមបារាំង", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_006", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0006", "name_kh": "ខ្ទឹមក្រហមបក", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_007", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0010", "name_kh": "ត្រសក់", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_008", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0001", "name_kh": "ស្លឹកខ្ទឹម", "size": "300g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_009", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0013", "name_kh": "ជីរណា", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_010", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0028", "name_kh": "ជីវ៉ាន់សុយ", "size": "5pcs", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_011", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0016", "name_kh": "ម្ទេសម៉ាឡេក្រហម", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_012", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0015", "name_kh": "ម្ទេសហិរខ្មែរ", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_013", "location": "Tube Coffee+", "category": "Daily Product", "code": "D0005", "name_kh": "មីពងមាន់លឿង", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_014", "location": "Tube Coffee+", "category": "Daily Product", "code": "S0046", "name_kh": "លត", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_015", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0038", "name_kh": "ខ្ទឹមសបក", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_016", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0039", "name_kh": "ម្រះព្រៅ", "size": "1Bach", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_017", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0040", "name_kh": "កូនខាត់ណា", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_018", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0041", "name_kh": "ស្ពៃក្ដោប", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_019", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0042", "name_kh": "ប៉េងប៉ោះខ្ចី", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_020", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0043", "name_kh": "ស្វាយខ្ចី", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_021", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0044", "name_kh": "ត្រកួនជ្រក់", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_022", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0081", "name_kh": "មីជាតិ(សាច់ជ្រូកជញ្ជ្រាំ)", "size": "24pack", "uom": "CTN", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_023", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0009", "name_kh": "ខ្ទឹមសបំពង", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_024", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0010", "name_kh": "ម្ទេសមត់ស្ងួត", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_025", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0011", "name_kh": "ពងមាន់", "size": "1pcs", "uom": "PCS", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_026", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0013", "name_kh": "ប្រេងឆា", "size": "1Tin", "uom": "Tin", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_027", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0015", "name_kh": "ទឹកស៊ីអ៊ីវរូបគោ", "size": "450ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_028", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0016", "name_kh": "ទឹកស៊ីអ៊ីវខ្មៅ", "size": "750ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_029", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0049", "name_kh": "ថង់ច្រកសរសៃមី", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_030", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0050", "name_kh": "ទឹកម្ទេស", "size": "2000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_031", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0082", "name_kh": "ត្រីខរកំប៉ុង", "size": "10cans", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_032", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0017", "name_kh": "អង្ករ ផ្កាម្លិះ", "size": "50000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_033", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0018", "name_kh": "ប្រហិតសាច់ជ្រូក", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_034", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0053", "name_kh": "ស្ពាហ្គាទី", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_035", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0080", "name_kh": "ពងទា", "size": "1pcs", "uom": "PCS", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_036", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0001", "name_kh": "ទឹកផ្សំ បាយមាន់គ្រឿង", "size": "300g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_037", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0021", "name_kh": "ទឹកផ្សំ បាយឡុកឡាក់", "size": "100g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_038", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0039", "name_kh": "ទឹកផ្សំ បាយមាន់បំពង", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_039", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0006", "name_kh": "ទឹកផ្សំឡុកឡាក់", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_040", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0009", "name_kh": "ទឹកផ្សំមីសាច់ស្រួច", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_041", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0003", "name_kh": "ទឹកត្រីកោះកុង", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_042", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0004", "name_kh": "ទឹកត្រីជូរអែម", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_043", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0005", "name_kh": "អំបិលម្រេចក្រូចឆ្មា", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_044", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0014", "name_kh": "ម្ទេសឆា", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_045", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0015", "name_kh": "ទឹកប្រេងម្ទេស", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_046", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0031", "name_kh": "ទឹកខ្លាញ់ស្រូបបាយសាច់ជ្រូក", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_047", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0011", "name_kh": "ជ្រក់ម្ទេសម៉ាឡេ", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_048", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0044", "name_kh": "ទឹកផ្សំឆាខ្មៅ", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_049", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0045", "name_kh": "ទឹកផ្សំ ស្វាយខ្ចី", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_050", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0047", "name_kh": "ទឹកត្រីកោះកុងហឹរ", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_051", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "S0024", "name_kh": "ពងមាន់ចៀន", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_052", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "S0049", "name_kh": "ទឹកស៊ុប", "size": "5000L", "uom": "Btl", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_053", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "S0008", "name_kh": "ជ្រក់ត្រសក់", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_054", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM001", "name_kh": "ពងមាន់ខរ", "size": "10pcs", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_055", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM008", "name_kh": "សាច់ មីសាច់ស្រួច", "size": "65g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_056", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM010", "name_kh": "សាច់ គោ", "size": "50g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_057", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM013", "name_kh": "សាច់ ឡុកឡាក់", "size": "80g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_058", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM027", "name_kh": "សាច់ ភ្លៅមាន់", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_059", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM017", "name_kh": "សាច់ជ្រូកអាំង", "size": "50g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_060", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM024", "name_kh": "ប៉ាតេ", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_061", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM028", "name_kh": "សាច់មាន់ស៊ីអ៊ីវ", "size": "90g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_062", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM029", "name_kh": "សាច់ពងទាត្រីប្រម៉ា", "size": "70g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_063", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM030", "name_kh": "សាច់ត្រីប្រលាក់", "size": "160g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_064", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM031", "name_kh": "ឆ្អឹងជំនីប្រលាក់", "size": "160g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_065", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM032", "name_kh": "ស្លាបមាន់ប្រលាក់", "size": "190g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_066", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM033", "name_kh": "សាច់ងៀតគោ", "size": "50g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_067", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM034", "name_kh": "សាច់មាន់់ឆាខ្ញី", "size": "140g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_068", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM035", "name_kh": "ឆាឆ្អឹងជំនីរជូអែម", "size": "150g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_069", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM036", "name_kh": "សាច់ជ្រូកខ", "size": "150g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_070", "location": "OnMart", "category": "Finished Product", "code": "10130122", "name_kh": "ប៉ាស្តាសាច់ក្រក", "size": "180g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_071", "location": "OnMart", "category": "Finished Product", "code": "10130123", "name_kh": "ប៉ាស្តាគ្រឿងសមុទ្រហឹរ", "size": "180g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_072", "location": "OnMart", "category": "Finished Product", "code": "10130124", "name_kh": "ប៉ាស្តាហេមកាបូណារ៉ា", "size": "180g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_073", "location": "OnMart", "category": "Finished Product", "code": "10130125", "name_kh": "បាយឆាសាច់់មាន់ខ្ទឹម", "size": "160g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_074", "location": "OnMart", "category": "Finished Product", "code": "10130126", "name_kh": "បាយឆាម៉ាឡា", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_075", "location": "OnMart", "category": "Finished Product", "code": "10130127", "name_kh": "គុយទាវឆាសាច់គោ", "size": "300g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_076", "location": "OnMart", "category": "Finished Product", "code": "10130128", "name_kh": "មីឆាសាច់មាន់", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_077", "location": "OnMart", "category": "Finished Product", "code": "10130129", "name_kh": "បាយសាស៊ីវ", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_078", "location": "OnMart", "category": "Finished Product", "code": "10130130", "name_kh": "បាយឆាម្រះព្រៅ", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_079", "location": "OnMart", "category": "Finished Product", "code": "10130131", "name_kh": "បាយឡុកឡាក់", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_080", "location": "OnMart", "category": "Finished Product", "code": "10130132", "name_kh": "លតឆា", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_081", "location": "OnMart", "category": "Finished Product", "code": "10130133", "name_kh": "បាយឆាសាច់មាន់", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_082", "location": "OnMart", "category": "Finished Product", "code": "10130134", "name_kh": "បាយឆាខ្ញីសាច់មាន់", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_083", "location": "OnMart", "category": "Finished Product", "code": "10140135", "name_kh": "សាច់ស្លាយអូស្ត្រាលី", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_084", "location": "OnMart", "category": "Finished Product", "code": "10140136", "name_kh": "បាខន", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_085", "location": "OnMart", "category": "Finished Product", "code": "10140137", "name_kh": "បង្គា", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_086", "location": "OnMart", "category": "Dry Store", "code": "10150138", "name_kh": "ពោតឆ្អិន", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_087", "location": "OnMart", "category": "Dry Store", "code": "10150139", "name_kh": "ស្ពៃក្តោប", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_088", "location": "OnMart", "category": "Dry Store", "code": "10150140", "name_kh": "ផ្សិតម្ចុល", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_089", "location": "OnMart", "category": "Dry Store", "code": "10150141", "name_kh": "ខ្ទឹមខ្យល់", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_090", "location": "OnMart", "category": "Dry Store", "code": "10150142", "name_kh": "ម្ទេសម៉ាឡេ", "size": "100g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_091", "location": "OnMart", "category": "Dry Store", "code": "10150143", "name_kh": "ទឹកផ្សំម៉ាឡា", "size": "3000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_092", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160144", "name_kh": "ប្រហិតសាច់ជ្រូកកញ្ចប់", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_093", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160145", "name_kh": "ប្រហិតកាំប្រម៉ា", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_094", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160146", "name_kh": "ប្រហិតសាច់់គោមានស្នូរ", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_095", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160147", "name_kh": "ប្រហិតបង្កង", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_096", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160148", "name_kh": "ប្រហិតសាច់ជ្រូក", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_097", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160149", "name_kh": "ប្រហិតត្រី", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_098", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160150", "name_kh": "ឈាមទា", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_099", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160151", "name_kh": "ប្រហិតសាច់គោមានស្នូរចៀន", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_100", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160152", "name_kh": "ប្រហិតកាំប្រម៉ាចៀន", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_101", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160153", "name_kh": "ប្រហិតពងត្រីចៀន", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_102", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160154", "name_kh": "ប្រហិតសាច់គោចៀន", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_103", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160155", "name_kh": "ប្រហិតបន្លែចៀន", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_104", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160156", "name_kh": "ប្រហិតតៅហ៊ូ", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_105", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160157", "name_kh": "ពងស្ងោរ", "size": "Pack", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}];
+    const DEFAULT_MASTER_ITEMS = [{"id": "item_001", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0003", "name_kh": "ក្រូចឆ្មា", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_002", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0004", "name_kh": "សណ្តែកបណ្តុះ", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_003", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0005", "name_kh": "ត្រកួនចិន", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_004", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0008", "name_kh": "ប៉េងប៉ោះទុំ", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_005", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0009", "name_kh": "ខ្ទឹមបារាំង", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_006", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0006", "name_kh": "ខ្ទឹមក្រហមបក", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_007", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0010", "name_kh": "ត្រសក់", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_008", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0001", "name_kh": "ស្លឹកខ្ទឹម", "size": "300g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_009", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0013", "name_kh": "ជីរណា", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_010", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0028", "name_kh": "ជីវ៉ាន់សុយ", "size": "5pcs", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_011", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0016", "name_kh": "ម្ទេសម៉ាឡេក្រហម", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_012", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0015", "name_kh": "ម្ទេសហិរខ្មែរ", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_013", "location": "Tube Coffee+", "category": "Daily Product", "code": "D0005", "name_kh": "មីពងមាន់លឿង", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_014", "location": "Tube Coffee+", "category": "Daily Product", "code": "S0046", "name_kh": "លត", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_015", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0038", "name_kh": "ខ្ទឹមសបក", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_016", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0039", "name_kh": "ម្រះព្រៅ", "size": "1Bach", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_017", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0040", "name_kh": "កូនខាត់ណា", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_018", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0041", "name_kh": "ស្ពៃក្ដោប", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_019", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0042", "name_kh": "ប៉េងប៉ោះខ្ចី", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_020", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0043", "name_kh": "ស្វាយខ្ចី", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_021", "location": "Tube Coffee+", "category": "Daily Product", "code": "V0044", "name_kh": "ត្រកួនជ្រក់", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_022", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0081", "name_kh": "មីជាតិ(សាច់ជ្រូកជញ្ជ្រាំ)", "size": "24pack", "uom": "CTN", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_023", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0009", "name_kh": "ខ្ទឹមសបំពង", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_024", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0010", "name_kh": "ម្ទេសមត់ស្ងួត", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_025", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0011", "name_kh": "ពងមាន់", "size": "1pcs", "uom": "PCS", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_026", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0013", "name_kh": "ប្រេងឆា", "size": "1Tin", "uom": "Tin", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_027", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0015", "name_kh": "ទឹកស៊ីអ៊ីវរូបគោ", "size": "450ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_028", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0016", "name_kh": "ទឹកស៊ីអ៊ីវខ្មៅ", "size": "750ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_029", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0049", "name_kh": "ថង់ច្រកសរសៃមី", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_030", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0050", "name_kh": "ទឹកម្ទេស", "size": "2000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_031", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0082", "name_kh": "ត្រីខរកំប៉ុង", "size": "10cans", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_032", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0017", "name_kh": "អង្ករ ផ្កាម្លិះ", "size": "50000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_033", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0018", "name_kh": "ប្រហិតសាច់ជ្រូក", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_034", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0053", "name_kh": "ស្ពាហ្គាទី", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_035", "location": "Tube Coffee+", "category": "Dry Store", "code": "D0080", "name_kh": "ពងទា", "size": "1pcs", "uom": "PCS", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_036", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0001", "name_kh": "ទឹកផ្សំ បាយមាន់គ្រឿង", "size": "300g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_037", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0021", "name_kh": "ទឹកផ្សំ បាយឡុកឡាក់", "size": "100g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_038", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0039", "name_kh": "ទឹកផ្សំ បាយមាន់បំពង", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_039", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0006", "name_kh": "ទឹកផ្សំឡុកឡាក់", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_040", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0009", "name_kh": "ទឹកផ្សំមីសាច់ស្រួច", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_041", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0003", "name_kh": "ទឹកត្រីកោះកុង", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_042", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0004", "name_kh": "ទឹកត្រីជូរអែម", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_043", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0005", "name_kh": "អំបិលម្រេចក្រូចឆ្មា", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_044", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0014", "name_kh": "ម្ទេសឆា", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_045", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0015", "name_kh": "ទឹកប្រេងម្ទេស", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_046", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0031", "name_kh": "ទឹកខ្លាញ់ស្រូបបាយសាច់ជ្រូក", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_047", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0011", "name_kh": "ជ្រក់ម្ទេសម៉ាឡេ", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_048", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0044", "name_kh": "ទឹកផ្សំឆាខ្មៅ", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_049", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0045", "name_kh": "ទឹកផ្សំ ស្វាយខ្ចី", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_050", "location": "Tube Coffee+", "category": "Semi Product Sauce", "code": "S0047", "name_kh": "ទឹកត្រីកោះកុងហឹរ", "size": "1000ml", "uom": "BTL", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_051", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "S0024", "name_kh": "ពងមាន់ចៀន", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_052", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "S0049", "name_kh": "ទឹកស៊ុប", "size": "5000L", "uom": "Btl", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_053", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "S0008", "name_kh": "ជ្រក់ត្រសក់", "size": "1000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_054", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM001", "name_kh": "ពងមាន់ខរ", "size": "10pcs", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_055", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM008", "name_kh": "សាច់ មីសាច់ស្រួច", "size": "65g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_056", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM010", "name_kh": "សាច់ គោ", "size": "50g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_057", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM013", "name_kh": "សាច់ ឡុកឡាក់", "size": "80g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_058", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM027", "name_kh": "សាច់ ភ្លៅមាន់", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_059", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM017", "name_kh": "សាច់ជ្រូកអាំង", "size": "50g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_060", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM024", "name_kh": "ប៉ាតេ", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_061", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM028", "name_kh": "សាច់មាន់ស៊ីអ៊ីវ", "size": "90g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_062", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM029", "name_kh": "សាច់ពងទាត្រីប្រម៉ា", "size": "70g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_063", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM030", "name_kh": "សាច់ត្រីប្រលាក់", "size": "160g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_064", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM031", "name_kh": "ឆ្អឹងជំនីប្រលាក់", "size": "160g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_065", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM032", "name_kh": "ស្លាបមាន់ប្រលាក់", "size": "190g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_066", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM033", "name_kh": "សាច់ងៀតគោ", "size": "50g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_067", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM034", "name_kh": "សាច់មាន់់ឆាខ្ញី", "size": "140g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_068", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM035", "name_kh": "ឆាឆ្អឹងជំនីរជូអែម", "size": "150g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_069", "location": "Tube Coffee+", "category": "Semi Product Meat", "code": "SM036", "name_kh": "សាច់ជ្រូកខ", "size": "150g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_070", "location": "OnMart", "category": "Finished Product", "code": "10130122", "name_kh": "ប៉ាស្តាសាច់ក្រក", "size": "180g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_071", "location": "OnMart", "category": "Finished Product", "code": "10130123", "name_kh": "ប៉ាស្តាគ្រឿងសមុទ្រហឹរ", "size": "180g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_072", "location": "OnMart", "category": "Finished Product", "code": "10130124", "name_kh": "ប៉ាស្តាហេមកាបូណារ៉ា", "size": "180g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_073", "location": "OnMart", "category": "Finished Product", "code": "10130125", "name_kh": "បាយឆាសាច់់មាន់ខ្ទឹម", "size": "160g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_074", "location": "OnMart", "category": "Finished Product", "code": "10130126", "name_kh": "បាយឆាម៉ាឡា", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_075", "location": "OnMart", "category": "Finished Product", "code": "10130127", "name_kh": "គុយទាវឆាសាច់គោ", "size": "300g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_076", "location": "OnMart", "category": "Finished Product", "code": "10130128", "name_kh": "មីឆាសាច់មាន់", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_077", "location": "OnMart", "category": "Finished Product", "code": "10130129", "name_kh": "បាយសាស៊ីវ", "size": "200g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_078", "location": "OnMart", "category": "Finished Product", "code": "10130130", "name_kh": "បាយឆាម្រះព្រៅ", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_079", "location": "OnMart", "category": "Finished Product", "code": "10130131", "name_kh": "បាយឡុកឡាក់", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_080", "location": "OnMart", "category": "Finished Product", "code": "10130132", "name_kh": "លតឆា", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_081", "location": "OnMart", "category": "Finished Product", "code": "10130133", "name_kh": "បាយឆាសាច់មាន់", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_082", "location": "OnMart", "category": "Finished Product", "code": "10130134", "name_kh": "បាយឆាខ្ញីសាច់មាន់", "size": "250g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_083", "location": "OnMart", "category": "Finished Product", "code": "10140135", "name_kh": "សាច់ស្លាយអូស្ត្រាលី", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_084", "location": "OnMart", "category": "Finished Product", "code": "10140136", "name_kh": "បាខន", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_085", "location": "OnMart", "category": "Finished Product", "code": "10140137", "name_kh": "បង្គា", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_086", "location": "OnMart", "category": "Dry Store", "code": "10150138", "name_kh": "ពោតឆ្អិន", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_087", "location": "OnMart", "category": "Dry Store", "code": "10150139", "name_kh": "ស្ពៃក្តោប", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_088", "location": "OnMart", "category": "Dry Store", "code": "10150140", "name_kh": "ផ្សិតម្ចុល", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_089", "location": "OnMart", "category": "Dry Store", "code": "10150141", "name_kh": "ខ្ទឹមខ្យល់", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_090", "location": "OnMart", "category": "Dry Store", "code": "10150142", "name_kh": "ម្ទេសម៉ាឡេ", "size": "100g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_091", "location": "OnMart", "category": "Dry Store", "code": "10150143", "name_kh": "ទឹកផ្សំម៉ាឡា", "size": "3000g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_092", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160144", "name_kh": "ប្រហិតសាច់ជ្រូកកញ្ចប់", "size": "500g", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_093", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160145", "name_kh": "ប្រហិតកាំប្រម៉ា", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_094", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160146", "name_kh": "ប្រហិតសាច់់គោមានស្នូរ", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_095", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160147", "name_kh": "ប្រហិតបង្កង", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_096", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160148", "name_kh": "ប្រហិតសាច់ជ្រូក", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_097", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160149", "name_kh": "ប្រហិតត្រី", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_098", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160150", "name_kh": "ឈាមទា", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_099", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160151", "name_kh": "ប្រហិតសាច់គោមានស្នូរចៀន", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_100", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160152", "name_kh": "ប្រហិតកាំប្រម៉ាចៀន", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_101", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160153", "name_kh": "ប្រហិតពងត្រីចៀន", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_102", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160154", "name_kh": "ប្រហិតសាច់គោចៀន", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_103", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160155", "name_kh": "ប្រហិតបន្លែចៀន", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_104", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160156", "name_kh": "ប្រហិតតៅហ៊ូ", "size": "5stick", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}, {"id": "item_105", "location": "OnMart", "category": "Semi Product Sauce", "code": "10160157", "name_kh": "ពងស្ងោរ", "size": "Pack", "uom": "Pack", "cpu": 0.0, "selling_price": 0.0}];
+
+    let MASTER_ITEMS = JSON.parse(localStorage.getItem('cpu_custom_items') || 'null');
+    if (!MASTER_ITEMS || !Array.isArray(MASTER_ITEMS) || MASTER_ITEMS.length === 0) {
+      MASTER_ITEMS = DEFAULT_MASTER_ITEMS;
+      localStorage.setItem('cpu_custom_items', JSON.stringify(MASTER_ITEMS));
+    }
+
+    // Role-Based Price Access Control (Admin & Manager Only)
+    function canAccessPrice() {
+      if (!currentUser) return false;
+      const role = (currentUser.role || '').toLowerCase();
+      return role === 'admin' || role === 'manager';
+    }
+
+    // Price Editing Handlers
+    function openEditPriceModal(code) {
+      if (!canAccessPrice()) {
+        alert('មានតែ Admin និង Manager ប៉ុណ្ណោះដែលអាចកែសម្រួលតម្លៃបាន!');
+        return;
+      }
+      const item = MASTER_ITEMS.find(it => it.code === code);
+      if (!item) return;
+
+      document.getElementById('edit-item-code-hidden').value = item.code;
+      document.getElementById('edit-item-code-badge').textContent = item.code;
+      document.getElementById('edit-item-name-kh').textContent = item.name_kh;
+      document.getElementById('edit-item-meta').textContent = `${item.location} • ${item.category} • ${item.size || ''} ${item.uom}`;
+      document.getElementById('edit-item-cpu').value = item.cpu || 0;
+      document.getElementById('edit-item-selling').value = item.selling_price || 0;
+      calcEditMargin();
+
+      document.getElementById('edit-price-modal').classList.remove('hidden');
+    }
+
+    function closeEditPriceModal() {
+      document.getElementById('edit-price-modal').classList.add('hidden');
+    }
+
+    function calcEditMargin() {
+      const cpu = parseFloat(document.getElementById('edit-item-cpu').value) || 0;
+      const selling = parseFloat(document.getElementById('edit-item-selling').value) || 0;
+      const badge = document.getElementById('edit-item-margin-badge');
+      if (selling > 0) {
+        const margin = (((selling - cpu) / selling) * 100).toFixed(1);
+        badge.textContent = `${margin}% (${(selling - cpu).toFixed(2)}$)`;
+        badge.className = margin >= 0 ? "font-mono font-bold text-emerald-700" : "font-mono font-bold text-rose-600";
+      } else {
+        badge.textContent = '0.0%';
+        badge.className = "font-mono font-bold text-slate-500";
+      }
+    }
+
+    function saveItemPrice(e) {
+      e.preventDefault();
+      if (!canAccessPrice()) {
+        alert('អ្នកគ្មានសិទ្ធិកែប្រែតម្លៃមុខទំនិញទេ!');
+        return;
+      }
+      const code = document.getElementById('edit-item-code-hidden').value;
+      const cpu = parseFloat(document.getElementById('edit-item-cpu').value) || 0;
+      const selling = parseFloat(document.getElementById('edit-item-selling').value) || 0;
+
+      const idx = MASTER_ITEMS.findIndex(it => it.code === code);
+      if (idx !== -1) {
+        MASTER_ITEMS[idx].cpu = cpu;
+        MASTER_ITEMS[idx].selling_price = selling;
+        localStorage.setItem('cpu_custom_items', JSON.stringify(MASTER_ITEMS));
+        
+        closeEditPriceModal();
+        renderDailyTable();
+        renderItemMasterTable();
+        updateDailyKPIs();
+        alert(`បានកែសម្រួល និងរក្សាទុកតម្លៃ ${MASTER_ITEMS[idx].name_kh} ($${cpu.toFixed(2)}) ដោយជោគជ័យ!`);
+      }
+    }
+
+    // Add New Master Item Handlers
+    function openAddItemModal() {
+      if (!canAccessPrice()) {
+        alert('មានតែ Admin និង Manager ប៉ុណ្ណោះដែលអាចបន្ថែមមុខទំនិញថ្មីបាន!');
+        return;
+      }
+      document.getElementById('add-item-modal').classList.remove('hidden');
+    }
+
+    function closeAddItemModal() {
+      document.getElementById('add-item-modal').classList.add('hidden');
+    }
+
+    function handleAddNewItem(e) {
+      e.preventDefault();
+      if (!canAccessPrice()) {
+        alert('អ្នកគ្មានសិទ្ធិបន្ថែមទំនិញថ្មីទេ!');
+        return;
+      }
+      const code = document.getElementById('add-item-code').value.trim().toUpperCase();
+      const nameKh = document.getElementById('add-item-name').value.trim();
+      const loc = document.getElementById('add-item-loc').value;
+      const cat = document.getElementById('add-item-cat').value;
+      const sizeUom = document.getElementById('add-item-size').value.trim();
+      const cpu = parseFloat(document.getElementById('add-item-cpu').value) || 0;
+
+      if (!code || !nameKh) {
+        alert('សូមបំពេញកូដ និងឈ្មោះមុខទំនិញ!');
+        return;
+      }
+
+      if (MASTER_ITEMS.some(it => it.code.toUpperCase() === code)) {
+        alert('កូដទំនិញនេះមានរួចហើយ! សូមប្រើកូដផ្សេង។');
+        return;
+      }
+
+      const newItem = {
+        id: 'item_' + Date.now(),
+        location: loc,
+        category: cat,
+        code: code,
+        name_kh: nameKh,
+        size: sizeUom.split(' ')[0]?.trim() || '',
+        uom: sizeUom.split(' ')[1]?.trim() || 'Pack',
+        cpu: cpu,
+        selling_price: 0.0
+      };
+
+      MASTER_ITEMS.unshift(newItem);
+      localStorage.setItem('cpu_custom_items', JSON.stringify(MASTER_ITEMS));
+
+      document.getElementById('add-item-form').reset();
+      closeAddItemModal();
+      renderDailyTable();
+      renderItemMasterTable();
+      updateDailyKPIs();
+      alert(`បានបន្ថែមមុខទំនិញថ្មី ${nameKh} (${code}) ដោយជោគជ័យ!`);
+    }
 
     // Application State
     let currentUser = null;
@@ -886,8 +1145,15 @@
       currentUser = null;
       localStorage.removeItem('cpu_current_user');
       sessionStorage.removeItem('cpu_current_user');
+      const uInput = document.getElementById('login-username');
+      const pInput = document.getElementById('login-password');
+      if (uInput) uInput.value = '';
+      if (pInput) pInput.value = '';
       document.getElementById('auth-screen').classList.remove('hidden');
       switchAuthTab('login');
+      renderDailyTable();
+      renderItemMasterTable();
+      updateDailyKPIs();
     }
 
     function updateUserUI() {
@@ -895,6 +1161,15 @@
       document.getElementById('user-display-name').textContent = currentUser.name;
       document.getElementById('user-display-role').textContent = currentUser.role.toUpperCase() + ' - CPU';
       document.getElementById('user-avatar').textContent = currentUser.name.substring(0, 2).toUpperCase();
+
+      const addBtn = document.getElementById('btn-add-master-item');
+      if (addBtn) {
+        if (canAccessPrice()) {
+          addBtn.classList.remove('hidden');
+        } else {
+          addBtn.classList.add('hidden');
+        }
+      }
     }
 
     // Tab Switching
@@ -962,7 +1237,7 @@
         remEl.className = remaining < 0 ? "py-3 px-3 text-right font-bold text-rose-600 bg-rose-50/50" : "py-3 px-3 text-right font-bold text-slate-800 bg-slate-50";
       }
       if (valEl && item) {
-        valEl.textContent = '$' + (remaining * item.cpu).toFixed(2);
+        valEl.textContent = canAccessPrice() ? '$' + (remaining * item.cpu).toFixed(2) : '***';
       }
       updateDailyKPIs();
     }
@@ -973,6 +1248,7 @@
       const cat = document.getElementById('category-filter')?.value || 'ALL';
       const tbody = document.getElementById('daily-table-body');
       tbody.innerHTML = '';
+      const hasPriceAccess = canAccessPrice();
 
       let filtered = MASTER_ITEMS.filter(it => {
         const matchLoc = selectedLocation === 'ALL' || it.location === selectedLocation;
@@ -986,6 +1262,14 @@
         const remaining = (rec.opening || 0) + (rec.in || 0) - (rec.out || 0);
         const stockVal = (remaining * it.cpu).toFixed(2);
 
+        const cpuCell = hasPriceAccess
+          ? `<span class="inline-flex items-center gap-1 font-mono font-semibold text-slate-900">$${it.cpu.toFixed(2)} <button type="button" onclick="openEditPriceModal('${it.code}')" class="text-slate-400 hover:text-amber-700 p-0.5 rounded transition" title="កែសម្រួលតម្លៃ (Admin/Manager)"><i class="ph ph-pencil-simple text-xs"></i></button></span>`
+          : `<span class="font-mono text-slate-400 text-xs tracking-widest font-bold select-none" title="តម្លៃត្រូវបានការពារ សម្រាប់តែ Admin & Manager">***</span>`;
+
+        const valCell = hasPriceAccess
+          ? `$${stockVal}`
+          : `<span class="font-mono text-slate-400 text-xs tracking-widest font-bold select-none" title="តម្លៃត្រូវបានការពារ សម្រាប់តែ Admin & Manager">***</span>`;
+
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50/80 transition-colors";
         tr.innerHTML = `
@@ -998,7 +1282,7 @@
           </td>
           <td class="py-2.5 px-3 text-slate-500">${it.category}</td>
           <td class="py-2.5 px-3 text-slate-500 font-mono">${it.size || ''} ${it.uom}</td>
-          <td class="py-2.5 px-3 text-right font-mono">$${it.cpu.toFixed(2)}</td>
+          <td class="py-2.5 px-3 text-right font-mono">${cpuCell}</td>
           <td class="py-2.5 px-3 text-right bg-amber-50/30">
             <input type="number" step="any" value="${rec.opening || ''}" placeholder="0"
               onchange="updateStockValue('${it.code}', 'opening', this.value)"
@@ -1018,7 +1302,7 @@
             ${remaining}
           </td>
           <td id="val-${it.code}" class="py-2.5 px-4 text-right font-mono text-slate-700">
-            $${stockVal}
+            ${valCell}
           </td>
         `;
         tbody.appendChild(tr);
@@ -1044,7 +1328,12 @@
 
       document.getElementById('kpi-stock-in').textContent = totalIn.toLocaleString();
       document.getElementById('kpi-stock-out').textContent = totalOut.toLocaleString();
-      document.getElementById('kpi-stock-value').textContent = '$' + totalVal.toFixed(2);
+      const hasPriceAccess = canAccessPrice();
+      if (hasPriceAccess) {
+        document.getElementById('kpi-stock-value').textContent = '$' + totalVal.toFixed(2);
+      } else {
+        document.getElementById('kpi-stock-value').innerHTML = '<span class="text-slate-400 font-mono tracking-wider font-bold select-none" title="តម្លៃត្រូវបានការពារ">***</span>';
+      }
       document.getElementById('kpi-total-items').textContent = MASTER_ITEMS.filter(it => selectedLocation === 'ALL' || it.location === selectedLocation).length;
     }
 
@@ -1123,10 +1412,36 @@
     // Item Master Table Rendering
     function renderItemMasterTable() {
       const tbody = document.getElementById('item-master-tbody');
+      if (!tbody) return;
       tbody.innerHTML = '';
+      const hasPriceAccess = canAccessPrice();
+
       MASTER_ITEMS.forEach(it => {
+        const cpuCell = hasPriceAccess
+          ? `$${it.cpu.toFixed(2)}`
+          : `<span class="font-mono text-slate-400 font-bold tracking-wider select-none">***</span>`;
+
+        const sellingCell = hasPriceAccess
+          ? `$${it.selling_price.toFixed(2)}`
+          : `<span class="font-mono text-slate-400 font-bold tracking-wider select-none">***</span>`;
+
+        const margin = (it.selling_price > 0)
+          ? (((it.selling_price - it.cpu) / it.selling_price) * 100).toFixed(1) + '%'
+          : '0.0%';
+
+        const marginCell = hasPriceAccess
+          ? margin
+          : `<span class="text-slate-400">-</span>`;
+
+        const actionCell = hasPriceAccess
+          ? `<button type="button" onclick="openEditPriceModal('${it.code}')" class="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg text-xs font-semibold font-khmer flex items-center gap-1 mx-auto transition">
+               <i class="ph ph-pencil-simple"></i>
+               <span>កែប្រែតម្លៃ</span>
+             </button>`
+          : `<span class="text-slate-400 font-khmer text-[11px] bg-slate-100 px-2 py-0.5 rounded">🔒 គ្មានសិទ្ធិ</span>`;
+
         const tr = document.createElement('tr');
-        tr.className = "hover:bg-slate-50";
+        tr.className = "hover:bg-slate-50 transition";
         tr.innerHTML = `
           <td class="py-2.5 px-4 font-mono font-bold text-slate-900">${it.code}</td>
           <td class="py-2.5 px-4 font-khmer font-semibold text-slate-800">${it.name_kh}</td>
@@ -1137,11 +1452,11 @@
           </td>
           <td class="py-2.5 px-3 text-slate-600">${it.category}</td>
           <td class="py-2.5 px-3 text-slate-600 font-mono">${it.size || ''} ${it.uom}</td>
-          <td class="py-2.5 px-3 text-right font-mono font-bold">$${it.cpu.toFixed(2)}</td>
-          <td class="py-2.5 px-3 text-right font-mono">$${it.selling_price.toFixed(2)}</td>
-          <td class="py-2.5 px-3 text-right font-mono text-emerald-600 font-semibold">0.0%</td>
+          <td class="py-2.5 px-3 text-right font-mono font-bold text-slate-900">${cpuCell}</td>
+          <td class="py-2.5 px-3 text-right font-mono text-slate-800">${sellingCell}</td>
+          <td class="py-2.5 px-3 text-right font-mono text-emerald-700 font-semibold">${marginCell}</td>
           <td class="py-2.5 px-4 text-center">
-            <button class="text-amber-800 hover:text-amber-900 font-khmer font-medium">កែសម្រួល</button>
+            ${actionCell}
           </td>
         `;
         tbody.appendChild(tr);
@@ -1158,6 +1473,7 @@
       const tbody = document.getElementById('print-table-tbody');
       const tfoot = document.getElementById('print-table-tfoot');
       tbody.innerHTML = '';
+      const hasPriceAccess = canAccessPrice();
 
       let idx = 1;
       let totIn = 0, totOut = 0, totVal = 0;
@@ -1171,6 +1487,9 @@
         totOut += (rec.out || 0);
         totVal += val;
 
+        const cpuPrint = hasPriceAccess ? `$${it.cpu.toFixed(2)}` : '***';
+        const valPrint = hasPriceAccess ? `$${val.toFixed(2)}` : '***';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td class="py-1.5 px-2 text-slate-400">${idx++}</td>
@@ -1178,11 +1497,11 @@
           <td class="py-1.5 px-3 font-khmer font-semibold">${it.name_kh}</td>
           <td class="py-1.5 px-2 text-slate-500">${it.category}</td>
           <td class="py-1.5 px-2 text-slate-600">${it.uom}</td>
-          <td class="py-1.5 px-2 text-right font-mono">$${it.cpu.toFixed(2)}</td>
+          <td class="py-1.5 px-2 text-right font-mono">${cpuPrint}</td>
           <td class="py-1.5 px-2 text-center font-mono font-bold text-emerald-800">${rec.in || 0}</td>
           <td class="py-1.5 px-2 text-center font-mono font-bold text-rose-800">${rec.out || 0}</td>
           <td class="py-1.5 px-2 text-right font-mono font-bold">${rem}</td>
-          <td class="py-1.5 px-3 text-right font-mono">$${val.toFixed(2)}</td>
+          <td class="py-1.5 px-3 text-right font-mono">${valPrint}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -1193,7 +1512,7 @@
           <td class="py-2 px-2 text-center font-mono text-emerald-900 font-bold">${totIn.toLocaleString()}</td>
           <td class="py-2 px-2 text-center font-mono text-rose-900 font-bold">${totOut.toLocaleString()}</td>
           <td class="py-2 px-2 text-right font-mono font-bold">-</td>
-          <td class="py-2 px-3 text-right font-mono text-blue-900 font-bold">$${totVal.toFixed(2)}</td>
+          <td class="py-2 px-3 text-right font-mono text-blue-900 font-bold">${hasPriceAccess ? '$' + totVal.toFixed(2) : '***'}</td>
         </tr>
       `;
 
