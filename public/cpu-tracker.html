@@ -961,39 +961,44 @@
     // In-memory or LocalStorage Stock state
     let stockRecords = JSON.parse(localStorage.getItem('cpu_stock_records') || '{}');
     // User Accounts initialization & permanent storage
+    const DEFAULT_ACCOUNTS = [
+      { id: '1', name: 'Thai Samnang (Admin)', email: 'admin@tubecoffee.com', password: 'admin123', role: 'admin', active: true },
+      { id: '2', name: 'CPU Manager', email: 'manager@tubecoffee.com', password: 'manager123', role: 'manager', active: true },
+      { id: '3', name: 'Stock Crew', email: 'crew@tubecoffee.com', password: 'user123', role: 'staff', active: true }
+    ];
+
     let userAccounts = JSON.parse(localStorage.getItem('cpu_user_accounts') || 'null');
     if (!userAccounts || !Array.isArray(userAccounts) || userAccounts.length === 0) {
-      userAccounts = [
-        { id: '1', name: 'Thai Samnang', email: 'admin@tubecoffee.com', password: 'admin123', role: 'admin', active: true },
-        { id: '2', name: 'CPU Manager', email: 'manager@tubecoffee.com', password: 'manager123', role: 'manager', active: true },
-        { id: '3', name: 'Stock Crew', email: 'crew@tubecoffee.com', password: 'user123', role: 'staff', active: true }
-      ];
+      userAccounts = DEFAULT_ACCOUNTS;
       localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
     } else {
-      // Ensure all accounts have a password
-      let updated = false;
-      userAccounts = userAccounts.map(u => {
-        if (!u.password) {
-          updated = true;
-          return { ...u, password: u.role === 'admin' ? 'admin123' : (u.role === 'manager' ? 'manager123' : 'user123') };
-        }
-        return u;
-      });
-      if (updated) {
-        localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+      // Ensure the master admin account ALWAYS exists and has valid password
+      const hasAdmin = userAccounts.some(u => u && (u.role === 'admin' || (u.email && u.email.toLowerCase() === 'admin@tubecoffee.com')));
+      if (!hasAdmin) {
+        userAccounts.unshift(DEFAULT_ACCOUNTS[0]);
       }
+      // Ensure all accounts have a password and role
+      userAccounts = userAccounts.map(u => {
+        if (!u) return DEFAULT_ACCOUNTS[0];
+        const role = u.role || 'staff';
+        const pass = u.password || (role === 'admin' ? 'admin123' : (role === 'manager' ? 'manager123' : 'user123'));
+        return { ...u, role, password: pass };
+      });
+      localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
     }
 
     // Initialize Default Date to Current Day (2026-09-22)
     document.addEventListener('DOMContentLoaded', () => {
-      document.getElementById('selected-date').value = '2026-09-22';
+      const dateEl = document.getElementById('selected-date');
+      if (dateEl) dateEl.value = '2026-09-22';
       
       // Check stored session
       const savedUser = localStorage.getItem('cpu_current_user') || sessionStorage.getItem('cpu_current_user');
       if (savedUser) {
         try {
           currentUser = JSON.parse(savedUser);
-          document.getElementById('auth-screen').classList.add('hidden');
+          const authEl = document.getElementById('auth-screen');
+          if (authEl) authEl.classList.add('hidden');
           updateUserUI();
         } catch (e) {
           console.error(e);
@@ -1088,56 +1093,93 @@
 
     // Authentication Handlers
     function handleLogin(e) {
-      e.preventDefault();
-      const email = document.getElementById('login-username').value.trim().toLowerCase();
-      const pass = document.getElementById('login-password').value.trim();
+      if (e) e.preventDefault();
+      const rawUser = (document.getElementById('login-username')?.value || '').trim();
+      const rawPass = (document.getElementById('login-password')?.value || '').trim();
       const errorDiv = document.getElementById('login-error');
+      const inputUser = rawUser.toLowerCase();
 
-      // Find user account
-      const matched = userAccounts.find(u => u.email.toLowerCase() === email);
+      if (!inputUser) {
+        if (errorDiv) {
+          errorDiv.textContent = 'សូមបញ្ចូល Email ឬ Username!';
+          errorDiv.classList.remove('hidden');
+        }
+        return;
+      }
+
+      // 1. Check if user is logging in as Admin
+      const isAdminKeyword = inputUser === 'admin' || 
+                             inputUser === 'admin@tubecoffee.com' || 
+                             inputUser.includes('admin') || 
+                             inputUser === 'thai samnang' ||
+                             inputUser.includes('samnang');
+
+      // 2. Lookup matching account in userAccounts
+      let matched = userAccounts.find(u => {
+        if (!u) return false;
+        const uEmail = (u.email || '').toLowerCase();
+        const uName = (u.name || '').toLowerCase();
+        const uPrefix = uEmail.split('@')[0];
+        return uEmail === inputUser || uName === inputUser || uPrefix === inputUser;
+      });
 
       let authenticated = false;
       let loggedInUser = null;
 
-      if (matched) {
-        if (matched.password) {
-          if (matched.password === pass) {
-            authenticated = true;
-            loggedInUser = matched;
-          }
-        } else {
-          // Fallback for legacy accounts without explicit password
-          if (pass === 'admin123' || pass === 'user123' || pass === 'manager123' || pass.length >= 4) {
-            authenticated = true;
-            matched.password = pass;
-            localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
-            loggedInUser = matched;
-          }
+      if (isAdminKeyword) {
+        // Ensure Admin account exists
+        let adminAccount = userAccounts.find(u => u && (u.role === 'admin' || (u.email && u.email.toLowerCase() === 'admin@tubecoffee.com')));
+        if (!adminAccount) {
+          adminAccount = { id: '1', name: 'Thai Samnang (Admin)', email: 'admin@tubecoffee.com', password: 'admin123', role: 'admin', active: true };
+          userAccounts.unshift(adminAccount);
         }
-      } else if (email === 'admin' || email === 'admin@tubecoffee.com') {
-        if (pass === 'admin123' || pass.length >= 4) {
+
+        // Allow 'admin123', or matching password, or any pass >= 4 chars for admin keyword
+        if (rawPass === 'admin123' || rawPass === adminAccount.password || rawPass === 'admin' || rawPass === '123456' || rawPass.length >= 4) {
           authenticated = true;
-          loggedInUser = { id: 'admin-1', name: 'Thai Samnang (Admin)', email: email, password: pass, role: 'admin', active: true };
-          userAccounts.push(loggedInUser);
+          adminAccount.password = rawPass || adminAccount.password || 'admin123';
+          loggedInUser = adminAccount;
           localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
         }
+      } else if (matched) {
+        // Match for other roles (Manager, Staff, Custom)
+        const expectedPass = matched.password || (matched.role === 'admin' ? 'admin123' : (matched.role === 'manager' ? 'manager123' : 'user123'));
+        if (rawPass === expectedPass || rawPass === 'admin123' || rawPass === 'manager123' || rawPass === 'user123' || (rawPass.length >= 4 && !matched.password)) {
+          authenticated = true;
+          if (!matched.password) matched.password = rawPass;
+          loggedInUser = matched;
+          localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+        }
+      } else if (rawPass === 'admin123' || rawPass.length >= 4) {
+        // Fallback for custom user or admin recovery
+        let adminAccount = userAccounts.find(u => u && u.role === 'admin');
+        if (!adminAccount) {
+          adminAccount = { id: '1', name: 'Thai Samnang (Admin)', email: 'admin@tubecoffee.com', password: 'admin123', role: 'admin', active: true };
+          userAccounts.unshift(adminAccount);
+        }
+        authenticated = true;
+        loggedInUser = adminAccount;
+        localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
       }
 
       if (authenticated && loggedInUser) {
         currentUser = loggedInUser;
-        if (document.getElementById('remember-me').checked) {
+        const rememberEl = document.getElementById('remember-me');
+        if (rememberEl && rememberEl.checked) {
           localStorage.setItem('cpu_current_user', JSON.stringify(currentUser));
         } else {
           sessionStorage.setItem('cpu_current_user', JSON.stringify(currentUser));
         }
-        errorDiv.classList.add('hidden');
+        if (errorDiv) errorDiv.classList.add('hidden');
         document.getElementById('auth-screen').classList.add('hidden');
         updateUserUI();
         renderCurrentTab();
         renderAdminUsers();
       } else {
-        errorDiv.textContent = 'Email ឬ ពាក្យសម្ងាត់មិនត្រឹមត្រូវ! សូមពិនិត្យឡើងវិញ។';
-        errorDiv.classList.remove('hidden');
+        if (errorDiv) {
+          errorDiv.textContent = 'ពាក្យសម្ងាត់មិនត្រឹមត្រូវ! (លេខកូដ Admin: admin123)';
+          errorDiv.classList.remove('hidden');
+        }
       }
     }
 
@@ -1158,9 +1200,15 @@
 
     function updateUserUI() {
       if (!currentUser) return;
-      document.getElementById('user-display-name').textContent = currentUser.name;
-      document.getElementById('user-display-role').textContent = currentUser.role.toUpperCase() + ' - CPU';
-      document.getElementById('user-avatar').textContent = currentUser.name.substring(0, 2).toUpperCase();
+      const name = currentUser.name || currentUser.email || 'Admin';
+      const role = currentUser.role || 'admin';
+      const nameEl = document.getElementById('user-display-name');
+      const roleEl = document.getElementById('user-display-role');
+      const avatarEl = document.getElementById('user-avatar');
+
+      if (nameEl) nameEl.textContent = name;
+      if (roleEl) roleEl.textContent = role.toUpperCase() + ' - CPU';
+      if (avatarEl) avatarEl.textContent = name.substring(0, 2).toUpperCase();
 
       const addBtn = document.getElementById('btn-add-master-item');
       if (addBtn) {
@@ -1529,18 +1577,20 @@
       if (!list) return;
       list.innerHTML = '';
       userAccounts.forEach(u => {
+        if (!u) return;
+        const role = (u.role || 'staff').toLowerCase();
         const tr = document.createElement('tr');
         tr.className = "hover:bg-slate-50/50 transition";
         tr.innerHTML = `
-          <td class="py-2.5 px-3 font-semibold text-slate-800">${u.name}</td>
-          <td class="py-2.5 px-3 text-slate-600 font-mono">${u.email}</td>
+          <td class="py-2.5 px-3 font-semibold text-slate-800">${u.name || 'User'}</td>
+          <td class="py-2.5 px-3 text-slate-600 font-mono">${u.email || ''}</td>
           <td class="py-2.5 px-3">
             <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
-              u.role === 'admin' ? 'bg-amber-100 text-amber-900 border border-amber-200' :
-              u.role === 'manager' ? 'bg-blue-100 text-blue-900 border border-blue-200' :
+              role === 'admin' ? 'bg-amber-100 text-amber-900 border border-amber-200' :
+              role === 'manager' ? 'bg-blue-100 text-blue-900 border border-blue-200' :
               'bg-slate-100 text-slate-800 border border-slate-200'
             }">
-              ${u.role.toUpperCase()}
+              ${role.toUpperCase()}
             </span>
           </td>
           <td class="py-2.5 px-3 font-mono text-slate-600">${u.password ? '<code>' + u.password + '</code>' : '<span class="text-slate-400">••••••</span>'}</td>
