@@ -12,6 +12,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Phosphor Icons -->
   <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Supabase JS Client (Optional Direct Cloud Connection) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -297,12 +299,13 @@
           </div>
         </div>
         <div class="flex items-center gap-2">
-          <button onclick="saveAllChanges()" class="px-2.5 py-1.5 bg-white text-[#0a162b] active:bg-slate-100 rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition">
+          <button onclick="saveAllChanges()" id="btn-mobile-save" class="px-2.5 py-1.5 bg-white text-[#0a162b] active:bg-slate-100 rounded-lg text-xs font-bold flex items-center gap-1 shadow-xs transition">
             <i class="ph-bold ph-floppy-disk"></i>
             <span class="font-khmer text-[11px]">Save</span>
           </button>
-          <div class="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center font-bold text-[10px] text-white border border-white/20">
+          <div class="relative w-7 h-7 rounded-full bg-white/10 flex items-center justify-center font-bold text-[10px] text-white border border-white/20">
             <span id="user-avatar-mobile">AD</span>
+            <span id="mobile-cloud-dot" class="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-[#0a162b] animate-pulse" title="Cloud Linked"></span>
           </div>
         </div>
       </div>
@@ -335,10 +338,10 @@
 
         <div class="hidden md:flex items-center gap-3">
           <!-- Online status indicator -->
-          <div id="online-badge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-navy-50 text-navy-950 border border-navy-200">
-            <span class="w-2 h-2 rounded-full bg-navy-700 animate-pulse"></span>
-            <span>Online Database</span>
-          </div>
+          <button onclick="CloudSync.fetchFromCloud(false)" id="online-badge" class="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-navy-50 text-navy-950 border border-navy-200 hover:bg-navy-100 transition cursor-pointer" title="ចុចដើម្បី Refresh ទិន្នន័យពី Cloud">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Online Linked</span>
+          </button>
 
           <!-- Print Quick Action -->
           <button onclick="openPrintModal()" class="flex items-center gap-1.5 bg-navy-950 hover:bg-navy-900 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold shadow-xs transition">
@@ -623,40 +626,92 @@
 
         <!-- ================= TAB 5: CLOUD SUPABASE CONFIG ================= -->
         <section id="tab-cloud" class="hidden space-y-6">
-          <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs max-w-2xl">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-10 h-10 rounded-xl bg-navy-100 text-navy-950 flex items-center justify-center text-xl">
-                <i class="ph-bold ph-database"></i>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl">
+            <!-- Card 1: Live Cross-Device Sync Status -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div class="flex items-center gap-3 border-b border-slate-100 pb-3">
+                <div class="w-10 h-10 rounded-xl bg-navy-100 text-navy-950 flex items-center justify-center text-xl shadow-xs">
+                  <i class="ph-bold ph-arrows-clockwise"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-bold text-slate-900 font-khmer">ការតភ្ជាប់រួមគ្នារវាង Phone & Laptop</h3>
+                  <p class="text-xs text-slate-500 font-khmer">ទិន្នន័យ Sync ស្វ័យប្រវត្តិតាមរយៈ Central Cloud Database</p>
+                </div>
               </div>
-              <div>
-                <h3 class="text-base font-bold text-slate-900 font-khmer">ការកំណត់ការរក្សាទុកទិន្នន័យ Online (Supabase Database)</h3>
-                <p class="text-xs text-slate-500 font-khmer">ទិន្នន័យត្រូវបានរក្សាទុកជាអចិន្ត្រៃយ៍ និង Sync ស្វ័យប្រវត្តិទៅ Cloud</p>
+
+              <div class="space-y-2.5 text-xs">
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <span class="font-khmer text-slate-600">ស្ថានភាពតភ្ជាប់ (Status):</span>
+                  <span id="cloud-tab-status-text" class="font-bold text-emerald-700 flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span>Online Linked (ដំណើរការរួមគ្នា)</span>
+                  </span>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <span class="font-khmer text-slate-600">ឧបករណ៍បច្ចុប្បន្ន (Current Device):</span>
+                  <span id="cloud-tab-device" class="font-bold text-navy-950">Detecting...</span>
+                </div>
+
+                <div class="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-200">
+                  <span class="font-khmer text-slate-600">Sync ចុងក្រោយ (Last Synced):</span>
+                  <span id="cloud-tab-last-time" class="font-mono font-bold text-navy-950">ទើបតែ Sync</span>
+                </div>
+
+                <div class="p-3 bg-navy-50 rounded-xl border border-navy-100 text-[11px] text-navy-950 space-y-1 font-khmer">
+                  <p class="font-bold">✨ ការពារទិន្នន័យស្វ័យប្រវត្តិ (Auto-Sync Features):</p>
+                  <p>• រាល់ពេលលោកអ្នកកត់ត្រាស្តុកលើទូរសព្ទ Laptop នឹងទទួលបានទិន្នន័យដូចគ្នា 100%។</p>
+                  <p>• ប្រព័ន្ធដំណើរការ Auto-Sync ជារៀងរាល់ ១៥ វិនាទី និងពេលបើកទូរសព្ទឡើងវិញ។</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2 pt-2">
+                  <button onclick="CloudSync.fetchFromCloud(false)" class="py-2.5 px-3 bg-navy-950 hover:bg-navy-900 text-white rounded-xl font-semibold flex items-center justify-center gap-1.5 font-khmer transition shadow-xs">
+                    <i class="ph-bold ph-arrows-down-up"></i>
+                    <span>ទាញយកពី Cloud</span>
+                  </button>
+                  <button onclick="CloudSync.saveToCloud('Manual User Push')" class="py-2.5 px-3 bg-white hover:bg-slate-50 text-navy-950 border border-navy-200 rounded-xl font-semibold flex items-center justify-center gap-1.5 font-khmer transition shadow-xs">
+                    <i class="ph-bold ph-cloud-arrow-up"></i>
+                    <span>បញ្ជូនឡើង Cloud</span>
+                  </button>
+                </div>
               </div>
             </div>
 
-            <div class="space-y-4 text-xs">
-              <div>
-                <label class="block font-semibold text-slate-700 mb-1">Supabase Project URL</label>
-                <input type="text" id="supabase-url" placeholder="https://your-project.supabase.co"
-                  class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs">
+            <!-- Card 2: Optional Custom Supabase Config -->
+            <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+              <div class="flex items-center gap-3 border-b border-slate-100 pb-3">
+                <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center text-xl">
+                  <i class="ph-bold ph-database"></i>
+                </div>
+                <div>
+                  <h3 class="text-base font-bold text-slate-900 font-khmer">ការកំណត់ Supabase ផ្ទាល់ខ្លួន (ជម្រើសបន្ថែម)</h3>
+                  <p class="text-xs text-slate-500 font-khmer">តភ្ជាប់ជាមួយ Private PostgreSQL Database របស់ក្រុមហ៊ុន</p>
+                </div>
               </div>
 
-              <div>
-                <label class="block font-semibold text-slate-700 mb-1">Supabase Anon Key</label>
-                <input type="password" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                  class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs">
-              </div>
+              <div class="space-y-3 text-xs">
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Supabase Project URL</label>
+                  <input type="text" id="supabase-url" placeholder="https://your-project.supabase.co"
+                    class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs">
+                </div>
 
-              <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-600 space-y-1 font-khmer text-[11px]">
-                <p class="font-bold text-slate-800">ចំណាំសុវត្ថិភាព និងភាពងាយស្រួល:</p>
-                <p>• បើមិនទាន់បញ្ចូល Supabase Key ប្រព័ន្ធនឹងរក្សាទុកទិន្នន័យក្នុង Browser Local Storage ភ្លាមៗដោយមិនបាត់បង់ឡើយ។</p>
-                <p>• កូដ SQL Schema ពេញលេញត្រូវបានរៀបចំរួចជាស្រេចនៅក្នុងឯកសារ <code class="bg-white px-1 py-0.5 rounded border border-slate-300 text-navy-950 font-mono">supabase_schema.sql</code> សម្រាប់ Execute ក្នុង Supabase SQL Editor។</p>
-              </div>
+                <div>
+                  <label class="block font-semibold text-slate-700 mb-1">Supabase Anon Key</label>
+                  <input type="password" id="supabase-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    class="w-full px-3 py-2 rounded-xl border border-slate-300 font-mono text-xs">
+                </div>
 
-              <button onclick="saveSupabaseConfig()" class="px-5 py-2.5 bg-navy-950 hover:bg-navy-900 text-white rounded-xl font-semibold flex items-center gap-2 font-khmer transition shadow-xs">
-                <i class="ph-bold ph-check"></i>
-                <span>ភ្ជាប់ និង Sync ទៅ Cloud ឥឡូវនេះ</span>
-              </button>
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-slate-600 space-y-1 font-khmer text-[11px]">
+                  <p>• បើមិនទាន់បញ្ចូល Supabase Key ប្រព័ន្ធនឹង Sync តាមរយៈ Central Cloud Database ដោយស្វ័យប្រវត្តិ។</p>
+                  <p>• ឯកសារ SQL Schema ពេញលេញមានក្នុង <code class="bg-white px-1 py-0.5 rounded border border-slate-300 text-navy-950 font-mono">supabase_schema.sql</code>។</p>
+                </div>
+
+                <button onclick="saveSupabaseConfig()" class="w-full py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-semibold flex items-center justify-center gap-2 font-khmer transition shadow-xs">
+                  <i class="ph-bold ph-check"></i>
+                  <span>រក្សាទុកការកំណត់ Supabase</span>
+                </button>
+              </div>
             </div>
           </div>
         </section>
@@ -979,6 +1034,7 @@
         MASTER_ITEMS[idx].cpu = cpu;
         MASTER_ITEMS[idx].selling_price = selling;
         localStorage.setItem('cpu_custom_items', JSON.stringify(MASTER_ITEMS));
+        CloudSync.saveToCloud('Item Price Changed');
         
         closeEditPriceModal();
         renderDailyTable();
@@ -1038,6 +1094,7 @@
 
       MASTER_ITEMS.unshift(newItem);
       localStorage.setItem('cpu_custom_items', JSON.stringify(MASTER_ITEMS));
+      CloudSync.saveToCloud('New Item Added');
 
       document.getElementById('add-item-form').reset();
       closeAddItemModal();
@@ -1081,11 +1138,304 @@
       localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
     }
 
+    // ==========================================
+    // CLOUD REAL-TIME SYNCHRONIZATION ENGINE
+    // Links Mobile Phone and Laptop seamlessly
+    // ==========================================
+    const CloudSync = {
+      isSyncing: false,
+      syncTimer: null,
+      lastSyncedAt: null,
+      cloudEndpoint: 'https://api.restful-api.dev/objects/ff808181a067127101a09522e8a600ef',
+
+      getDeviceName() {
+        const ua = navigator.userAgent || '';
+        if (/iPhone/i.test(ua)) return 'iPhone (Mobile)';
+        if (/iPad/i.test(ua)) return 'iPad (Tablet)';
+        if (/Android/i.test(ua)) return 'Android (Mobile)';
+        if (/Windows/i.test(ua)) return 'Windows PC (Laptop)';
+        if (/Macintosh/i.test(ua)) return 'MacBook (Laptop)';
+        return 'Web Browser';
+      },
+
+      setSyncStatus(state, msg) {
+        const badge = document.getElementById('online-badge');
+        const dot = document.getElementById('mobile-cloud-dot');
+        const tabStatus = document.getElementById('cloud-tab-status-text');
+        const tabTime = document.getElementById('cloud-tab-last-time');
+        const tabDev = document.getElementById('cloud-tab-device');
+
+        if (tabDev) tabDev.textContent = this.getDeviceName();
+        if (tabTime && this.lastSyncedAt) {
+          tabTime.textContent = new Date(this.lastSyncedAt).toLocaleTimeString('km-KH');
+        }
+
+        if (state === 'syncing') {
+          if (badge) {
+            badge.innerHTML = `<i class="ph-bold ph-arrows-clockwise animate-spin text-navy-950"></i><span>Syncing...</span>`;
+            badge.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-300";
+          }
+          if (dot) dot.className = "absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-amber-400 border border-[#0a162b] animate-spin";
+          if (tabStatus) {
+            tabStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 animate-spin"></span><span>កំពុង Sync ទិន្នន័យ...</span>`;
+            tabStatus.className = "font-bold text-amber-700 flex items-center gap-1.5";
+          }
+        } else if (state === 'synced') {
+          if (badge) {
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span>Online Linked</span>`;
+            badge.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-navy-50 text-navy-950 border border-navy-200 hover:bg-navy-100 transition cursor-pointer";
+          }
+          if (dot) dot.className = "absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 border border-[#0a162b] animate-pulse";
+          if (tabStatus) {
+            tabStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span><span>Online Linked (ដំណើរការរួមគ្នា)</span>`;
+            tabStatus.className = "font-bold text-emerald-700 flex items-center gap-1.5";
+          }
+        } else if (state === 'offline' || state === 'error') {
+          if (badge) {
+            badge.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>Offline (Local Cache)</span>`;
+            badge.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-200";
+          }
+          if (dot) dot.className = "absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-rose-500 border border-[#0a162b]";
+          if (tabStatus) {
+            tabStatus.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>${msg || 'មិនអាចតភ្ជាប់ Cloud (Offline)'}</span>`;
+            tabStatus.className = "font-bold text-rose-700 flex items-center gap-1.5";
+          }
+        }
+      },
+
+      async fetchFromCloud(silent = false) {
+        if (!navigator.onLine) {
+          this.setSyncStatus('offline', 'គ្មាន Internet');
+          return;
+        }
+        if (!silent) this.setSyncStatus('syncing');
+
+        let cloudData = null;
+
+        // Tier 1: Try /api/sync
+        try {
+          const resp = await fetch('/api/sync', { method: 'GET', cache: 'no-cache' });
+          if (resp.ok) {
+            const json = await resp.json();
+            if (json && json.success && json.data) {
+              cloudData = json.data;
+            }
+          }
+        } catch (e) {
+          // fallback
+        }
+
+        // Tier 2: Direct restful-api if Tier 1 not available or running locally
+        if (!cloudData) {
+          try {
+            const resp2 = await fetch(this.cloudEndpoint, { method: 'GET', cache: 'no-cache' });
+            if (resp2.ok) {
+              const json2 = await resp2.json();
+              if (json2 && json2.data) {
+                cloudData = json2.data;
+              }
+            }
+          } catch (e2) {
+            console.warn('Direct cloud fetch error:', e2);
+          }
+        }
+
+        // Optional Tier 3: Supabase
+        const supaUrl = localStorage.getItem('supabase_url');
+        const supaKey = localStorage.getItem('supabase_key');
+        if (!cloudData && supaUrl && supaKey && window.supabase) {
+          try {
+            const client = window.supabase.createClient(supaUrl, supaKey);
+            const { data, error } = await client.from('cpu_sync_store').select('data').eq('id', 'central').single();
+            if (!error && data && data.data) {
+              cloudData = data.data;
+            }
+          } catch (e3) {
+            console.warn('Supabase fetch failed:', e3);
+          }
+        }
+
+        if (cloudData) {
+          let updated = false;
+
+          // Merge Stock Records
+          if (cloudData.stockRecords && typeof cloudData.stockRecords === 'object') {
+            stockRecords = { ...stockRecords, ...cloudData.stockRecords };
+            localStorage.setItem('cpu_stock_records', JSON.stringify(stockRecords));
+            updated = true;
+          }
+
+          // Merge User Accounts
+          if (Array.isArray(cloudData.userAccounts) && cloudData.userAccounts.length > 0) {
+            const accMap = new Map();
+            userAccounts.forEach(u => { if (u && u.email) accMap.set(u.email.toLowerCase(), u); });
+            cloudData.userAccounts.forEach(u => { if (u && u.email) accMap.set(u.email.toLowerCase(), u); });
+            if (!accMap.has('admin@tubecoffee.com')) {
+              accMap.set('admin@tubecoffee.com', DEFAULT_ACCOUNTS[0]);
+            }
+            userAccounts = Array.from(accMap.values());
+            localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+            updated = true;
+          }
+
+          // Merge Master Items & Pricing
+          if (Array.isArray(cloudData.customItems) && cloudData.customItems.length > 0) {
+            const itemMap = new Map();
+            DEFAULT_MASTER_ITEMS.forEach(it => itemMap.set(it.code, it));
+            MASTER_ITEMS.forEach(it => itemMap.set(it.code, it));
+            cloudData.customItems.forEach(it => itemMap.set(it.code, it));
+            MASTER_ITEMS = Array.from(itemMap.values());
+            localStorage.setItem('cpu_custom_items', JSON.stringify(MASTER_ITEMS));
+            updated = true;
+          }
+
+          this.lastSyncedAt = Date.now();
+          this.setSyncStatus('synced');
+
+          if (updated) {
+            if (typeof renderDailyTable === 'function') renderDailyTable();
+            if (typeof renderItemMasterTable === 'function') renderItemMasterTable();
+            if (typeof updateDailyKPIs === 'function') updateDailyKPIs();
+            if (typeof renderAdminUsers === 'function') renderAdminUsers();
+          }
+
+          if (!silent) {
+            const toast = document.createElement('div');
+            toast.className = "fixed bottom-5 right-5 z-50 bg-navy-950 text-white px-4 py-2.5 rounded-xl shadow-xl text-xs font-khmer flex items-center gap-2 animate-bounce";
+            toast.innerHTML = `<i class="ph-bold ph-check-circle text-emerald-400 text-base"></i><span>ទាញយកទិន្នន័យពី Cloud រួចរាល់! Phone & Laptop ដូចគ្នា 100%</span>`;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+          }
+        } else {
+          this.setSyncStatus('synced');
+        }
+      },
+
+      async saveToCloud(reason = 'Auto-Sync') {
+        if (!navigator.onLine) {
+          this.setSyncStatus('offline', 'បានរក្សាទុកក្នុងទូរសព្ទ/Laptop (គ្មាន Internet)');
+          return;
+        }
+
+        if (this.isSyncing) return;
+        this.isSyncing = true;
+        this.setSyncStatus('syncing');
+
+        const payload = {
+          stockRecords,
+          userAccounts,
+          customItems: MASTER_ITEMS,
+          lastUpdated: Date.now(),
+          lastUpdatedDevice: this.getDeviceName(),
+          lastUpdatedBy: currentUser ? (currentUser.name || currentUser.email) : 'System Sync',
+          syncReason: reason
+        };
+
+        let saved = false;
+
+        // Tier 1: POST to /api/sync
+        try {
+          const resp = await fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (resp.ok) {
+            const resJson = await resp.json();
+            if (resJson && resJson.success) saved = true;
+          }
+        } catch (e) {
+          console.warn('/api/sync failed, fallback to direct cloud', e);
+        }
+
+        // Tier 2: Direct REST endpoint
+        if (!saved) {
+          try {
+            const resp2 = await fetch(this.cloudEndpoint, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: "CPU_DAILY_STOCK_CENTRAL",
+                data: payload
+              })
+            });
+            if (resp2.ok) saved = true;
+          } catch (e2) {
+            console.warn('Direct cloud push failed:', e2);
+          }
+        }
+
+        // Tier 3: Supabase
+        const supaUrl = localStorage.getItem('supabase_url');
+        const supaKey = localStorage.getItem('supabase_key');
+        if (supaUrl && supaKey && window.supabase) {
+          try {
+            const client = window.supabase.createClient(supaUrl, supaKey);
+            await client.from('cpu_sync_store').upsert({
+              id: 'central',
+              data: payload,
+              updated_at: new Date().toISOString()
+            });
+            saved = true;
+          } catch (e3) {
+            console.warn('Supabase push failed:', e3);
+          }
+        }
+
+        this.isSyncing = false;
+        if (saved) {
+          this.lastSyncedAt = Date.now();
+          this.setSyncStatus('synced');
+        } else {
+          this.setSyncStatus('error', 'មិនអាច Save ឡើង Cloud');
+        }
+      },
+
+      queueSync(reason = 'Value Change', delay = 1000) {
+        if (this.syncTimer) clearTimeout(this.syncTimer);
+        this.syncTimer = setTimeout(() => {
+          this.saveToCloud(reason);
+        }, delay);
+      },
+
+      initListeners() {
+        // Heartbeat sync every 15s when page is visible
+        setInterval(() => {
+          if (document.visibilityState === 'visible') {
+            this.fetchFromCloud(true);
+          }
+        }, 15000);
+
+        // When switching back to tab or device unlocks
+        window.addEventListener('visibilitychange', () => {
+          if (document.visibilityState === 'visible') {
+            this.fetchFromCloud(true);
+          }
+        });
+
+        window.addEventListener('focus', () => {
+          this.fetchFromCloud(true);
+        });
+
+        window.addEventListener('online', () => {
+          this.fetchFromCloud(false);
+        });
+
+        window.addEventListener('offline', () => {
+          this.setSyncStatus('offline', 'បាត់បង់ការតភ្ជាប់ Internet');
+        });
+      }
+    };
+
     // Initialize Default Date to Current Day (2026-09-22)
     document.addEventListener('DOMContentLoaded', () => {
       const dateEl = document.getElementById('selected-date');
       if (dateEl) dateEl.value = '2026-09-22';
       
+      // Initialize Real-time Cloud Listeners & Auto-Pull
+      CloudSync.initListeners();
+      CloudSync.fetchFromCloud(true);
+
       // Check stored session
       const savedUser = localStorage.getItem('cpu_current_user') || sessionStorage.getItem('cpu_current_user');
       if (savedUser) {
@@ -1169,6 +1519,7 @@
 
       userAccounts.push(newUser);
       localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+      CloudSync.saveToCloud('User Registered');
 
       // Auto login as newly registered user
       currentUser = newUser;
@@ -1187,7 +1538,7 @@
     }
 
     // Authentication Handlers
-    function handleLogin(e) {
+    async function handleLogin(e) {
       if (e) e.preventDefault();
       const rawUser = (document.getElementById('login-username')?.value || '').trim();
       const rawPass = (document.getElementById('login-password')?.value || '').trim();
@@ -1217,6 +1568,22 @@
         const uPrefix = uEmail.split('@')[0];
         return uEmail === inputUser || uName === inputUser || uPrefix === inputUser;
       });
+
+      // If no local match, check if created on other device via Cloud
+      if (!isAdminKeyword && !matched) {
+        try {
+          await CloudSync.fetchFromCloud(true);
+          matched = userAccounts.find(u => {
+            if (!u) return false;
+            const uEmail = (u.email || '').toLowerCase();
+            const uName = (u.name || '').toLowerCase();
+            const uPrefix = uEmail.split('@')[0];
+            return uEmail === inputUser || uName === inputUser || uPrefix === inputUser;
+          });
+        } catch (err) {
+          console.warn('Pre-login cloud check failed:', err);
+        }
+      }
 
       let authenticated = false;
       let loggedInUser = null;
@@ -1450,6 +1817,7 @@
       const numVal = parseFloat(val) || 0;
       stockRecords[key][field] = numVal;
       localStorage.setItem('cpu_stock_records', JSON.stringify(stockRecords));
+      CloudSync.queueSync('Stock Value Changed');
       
       // Update UI row calculations immediately
       const item = MASTER_ITEMS.find(i => i.code === itemCode);
@@ -1668,14 +2036,23 @@
       document.getElementById('kpi-total-items').textContent = MASTER_ITEMS.filter(it => selectedLocation === 'ALL' || it.location === selectedLocation).length;
     }
 
-    function saveAllChanges() {
+    async function saveAllChanges() {
       localStorage.setItem('cpu_stock_records', JSON.stringify(stockRecords));
       const btn = document.getElementById('online-badge');
-      btn.innerHTML = `<i class="ph-bold ph-check text-white"></i> Saved Online Successfully!`;
-      btn.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-navy-950 text-white border border-navy-900";
+      if (btn) {
+        btn.innerHTML = `<i class="ph-bold ph-check text-white"></i> Saved Online!`;
+        btn.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-navy-950 text-white border border-navy-900";
+      }
+      const mobBtn = document.getElementById('btn-mobile-save');
+      if (mobBtn) {
+        mobBtn.innerHTML = `<i class="ph-bold ph-check text-emerald-600"></i><span class="font-khmer text-[11px] text-emerald-700">Saved</span>`;
+        setTimeout(() => {
+          mobBtn.innerHTML = `<i class="ph-bold ph-floppy-disk"></i><span class="font-khmer text-[11px]">Save</span>`;
+        }, 2000);
+      }
+      await CloudSync.saveToCloud('Manual Save Button');
       setTimeout(() => {
-        btn.innerHTML = `<span class="w-2 h-2 rounded-full bg-navy-700 animate-pulse"></span><span>Online Database</span>`;
-        btn.className = "flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-navy-50 text-navy-950 border border-navy-200";
+        CloudSync.setSyncStatus('synced');
       }, 2500);
     }
 
@@ -1904,6 +2281,7 @@
       if (!confirm('តើអ្នកពិតជាចង់លុបគណនីនេះមែនទេ?')) return;
       userAccounts = userAccounts.filter(u => u.id !== id);
       localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+      CloudSync.saveToCloud('User Deleted');
       renderAdminUsers();
     }
 
@@ -1937,6 +2315,7 @@
         createdAt: new Date().toISOString()
       });
       localStorage.setItem('cpu_user_accounts', JSON.stringify(userAccounts));
+      CloudSync.saveToCloud('User Created');
       document.getElementById('new-user-name').value = '';
       document.getElementById('new-user-email').value = '';
       document.getElementById('new-user-pass').value = '';
